@@ -9,7 +9,7 @@ const apiRoutes = require("./routes/api");
 const swaggerSpec = require("./docs/swagger");
 
 const path = require("path");
-const FRONTEND_DIR = path.join(__dirname, "..", "..", "frontend");
+const FRONTEND_DIR = ["frontend", "docs"].map((d) => path.join(__dirname, "..", "..", d)).find((p) => require("fs").existsSync(p)) || path.join(__dirname, "..", "..", "docs");
 
 function createApp() {
   const app = express();

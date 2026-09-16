@@ -14,16 +14,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("password").addEventListener("input", () => clearErr("password"));
   document.getElementById("email").addEventListener("input", () => clearErr("email"));
 
-  // Prefill rápido das contas de acesso rápido (DEV / ADMIN)
-  document.querySelectorAll("[data-demo]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.getElementById("email").value = btn.dataset.demoEmail;
-      document.getElementById("password").value = btn.dataset.demoPass;
-      clearErr("email");
-      clearErr("password");
-      if (window.lucide) { /* noop */ }
-    });
-  });
 });
 
 async function onSubmit(e) {

@@ -32,7 +32,7 @@ function resolveBaseURL() {
 }
 
 /** URL do backend hospedado (Render). Preencha com algo como "https://bolao-backend.onrender.com/api". */
-const API_URL_REMOTO = "";
+const API_URL_REMOTO = "https://bolao-tgup.onrender.com/api";
 
 export const API = {
   baseURL: resolveBaseURL(),
