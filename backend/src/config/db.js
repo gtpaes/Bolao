@@ -7,7 +7,10 @@ async function connectDb() {
     throw new Error("MONGODB_URI não configurada. Copie .env.example para .env e preencha.");
   }
   mongoose.set("strictQuery", true);
-  await mongoose.connect(config.mongodbUri, { serverSelectionTimeoutMS: 15000 });
+  await mongoose.connect(config.mongodbUri, {
+    dbName: "bolao",
+    serverSelectionTimeoutMS: 15000,
+  });
   logger.info("MongoDB conectado");
 }
 

@@ -10,7 +10,8 @@ import { matchCardSmall } from "./dashboard.js";
 export async function render(view) {
   await loadTemplate(view, "round.html");
   await run(view, async () => {
-    view.querySelector('[data-host="sub"]').textContent = "Informação da rodada atual, prazo e jogos.";
+        const subHost = view.querySelector('[data-host="sub"]');
+    if (subHost) subHost.textContent = "Informação da rodada atual, prazo e jogos.";
 
     let round = null;
     try { round = (await getCurrentRound()).round; } catch (e) { /* noop */ }
@@ -32,14 +33,14 @@ export async function render(view) {
             <p class="t-ttl" style="margin-bottom:var(--space-3)">Data limite para palpites</p>
             <div id="round-countdown"></div>`}
         </div>`;
-      sumHost.replaceChildren(card);
+            if (sumHost) sumHost.replaceChildren(card);
       if (!closed) {
         const cdHost = card.querySelector("#round-countdown");
         const cd = countdown(round.deadline, "Encerrado");
         cdHost.appendChild(cd.node);
       }
     } else {
-      sumHost.replaceChildren(stateNode("off", {
+            if (sumHost) sumHost.replaceChildren(stateNode("off", {
         title: "Nenhuma rodada aberta",
         message: "A rodada atual será configurada pelo administrador. Quando estiver aberta, aqui você verá os jogos e o prazo.",
       }));
@@ -53,16 +54,16 @@ export async function render(view) {
       const wrap = document.createElement("div");
       wrap.className = "grid";
       wrap.replaceChildren(...matches.map(matchCardSmall));
-      mHost.replaceChildren(wrap);
+            if (mHost) mHost.replaceChildren(wrap);
     } else if (matches === null) {
-      mHost.replaceChildren(stateNode("error", { title: "Não foi possível carregar os jogos", message: "Ocorreu um erro ao buscar os jogos. Tente novamente." }));
+            if (mHost) mHost.replaceChildren(stateNode("error", { title: "Não foi possível carregar os jogos", message: "Ocorreu um erro ao buscar os jogos. Tente novamente." }));
     } else {
-      mHost.replaceChildren(stateNode("empty", { title: "Nenhum jogo nesta rodada", message: "Os jogos aparecerão quando a rodada for configurada." }));
+            if (mHost) mHost.replaceChildren(stateNode("empty", { title: "Nenhum jogo nesta rodada", message: "Os jogos aparecerão quando a rodada for configurada." }));
     }
 
     // Regras de pontuação
     const rulesHost = view.querySelector('[data-host="rules"]');
-    rulesHost.innerHTML = `
+        if (rulesHost) rulesHost.innerHTML = `
       <div class="card" id="scoring" style="margin-top:var(--space-5)">
         <div class="card-header"><h2 class="card-title"><i data-lucide="target"></i> Regras de pontuação</h2></div>
         <div class="card-body">

@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "rootDirectory": "docs",
+  "headers": [
+    {
+      "source": "/(.*)\\.html$",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    }
+  ]
+}

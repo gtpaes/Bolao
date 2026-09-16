@@ -14,12 +14,13 @@ export async function render(view) {
 
     const myHost = view.querySelector('[data-host="my-position"]');
     if (data.myPosition == null || data.ranking === null) {
-      myHost.replaceChildren(stateNode("off", { title: "Minha posição", message: "Sem dados no momento." }));
+            if (myHost) myHost.replaceChildren(stateNode("off", { title: "Minha posição", message: "Sem dados no momento." }));
     } else {
-      myHost.innerHTML = `<div class="row"><span class="pos-pill pos-me">${esc(String(data.myPosition))}</span><span class="t-soft">Sua posição atual</span></div>`;
+            if (myHost) myHost.innerHTML = `<div class="row"><span class="pos-pill pos-me">${esc(String(data.myPosition))}</span><span class="t-soft">Sua posição atual</span></div>`;
     }
 
-    const body = view.querySelector("#ranking-body");
+        const body = view.querySelector("#ranking-body");
+    if (!body) return;
     if (!data.ranking || !data.ranking.length) {
       body.innerHTML = `<tr><td colspan="4">${emptyRow()}</td></tr>`;
       return;
