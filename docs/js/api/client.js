@@ -55,6 +55,16 @@ export async function request(path, { method = "GET", body, headers = {} } = {})
   const token = getSessionToken();
   if (token) opts.headers.Authorization = `Bearer ${token}`;
   const res = await fetch(API.baseURL + path, opts);
+  // Sessao invalida/expirada ou token de outro backend: limpa e volta ao login.
+  if (res.status === 401 && !path.startsWith("/auth/")) {
+    try {
+      localStorage.removeItem("bolao.session");
+      localStorage.removeItem("bolao.profile");
+    } catch (e) { /* noop */ }
+    if (!window.location.pathname.endsWith("login.html")) {
+      window.location.replace("login.html");
+    }
+  }
   if (!res.ok) {
     let msg = `Erro ${res.status}`;
     try { const j = await res.json(); msg = j.message || msg; } catch (e) { /* noop */ }

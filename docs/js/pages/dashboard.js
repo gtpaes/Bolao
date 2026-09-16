@@ -80,17 +80,22 @@ function statCard(s) {
   return c;
 }
 
+const STATUS_LABEL = { live: "Ao vivo", finished: "Encerrado", scheduled: "Agendado", postponed: "Adiado", cancelled: "Cancelado" };
+
 export function matchCardSmall(m) {
   const c = document.createElement("div");
   c.className = "card match card-pad-sm";
+  // Placar aparece ao vivo E em jogo encerrado; "vs" só em jogo sem placar.
+  const hasScore = (m.status === "live" || m.status === "finished") && (m.home_score != null || m.away_score != null);
+  const topLabel = m.live ? '<span class="live-inline"><span class="dot"></span>Ao vivo</span>' : esc(STATUS_LABEL[m.status] || m.status || "");
   c.innerHTML = `
     <div class="match-top">
       <span>${esc(m.date ? dateShort(m.date) : "Em breve")}</span>
-      ${m.live ? '<span class="live-inline"><span class="dot"></span>Ao vivo</span>' : esc(m.status || "")}
+      ${topLabel}
     </div>
     <div class="match-teams">
       <div class="match-team">${crest(m.home_crest)}<span class="match-name">${esc(m.home || "Equipe A")}</span></div>
-      <div class="match-center">${m.live ? `<div class="match-score"><span class="score-box">${esc(m.home_score ?? "–")}</span><span class="score-box">${esc(m.away_score ?? "–")}</span></div>` : '<span class="t-muted">vs</span>'}</div>
+      <div class="match-center">${hasScore ? `<div class="match-score"><span class="score-box">${esc(m.home_score ?? "–")}</span><span class="score-box">${esc(m.away_score ?? "–")}</span></div>` : '<span class="t-muted">vs</span>'}</div>
       <div class="match-team">${crest(m.away_crest)}<span class="match-name">${esc(m.away || "Equipe B")}</span></div>
     </div>`;
   return c;

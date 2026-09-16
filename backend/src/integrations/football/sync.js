@@ -4,6 +4,8 @@ const Round = require("../../models/Round");
 const { listRounds, getRoundDetail } = require("./client");
 
 // Converte "30/05/2026" + "16:00" (ou ISO) em Date.
+// Retorna null quando a API-Futebol ainda não divulgou a data (jogo "a definir"):
+// inventar a data de agora corrompe a data da rodada e o auto-fechamento.
 function toDate(item) {
   if (item.data_realizacao_iso) {
     const d = new Date(item.data_realizacao_iso);
@@ -12,18 +14,23 @@ function toDate(item) {
   if (item.data_realizacao && item.hora_realizacao) {
     const [dd, mm, yyyy] = String(item.data_realizacao).split("/").map(Number);
     const [hh, mi] = String(item.hora_realizacao).split(":").map(Number);
-    const d = new Date(yyyy, (mm || 1) - 1, dd || 1, hh || 0, mi || 0);
+    if (!Number.isFinite(dd) || !Number.isFinite(mm) || !Number.isFinite(yyyy)) return null;
+    const d = new Date(yyyy, mm - 1, dd, hh || 0, mi || 0);
     if (!Number.isNaN(d.getTime())) return d;
   }
-  return new Date();
+  return null;
 }
 
+// A API-Futebol usa "agendado", "andamento", "finalizado", "adiado", "cancelado".
+// (Antes "finalizado" caía no default e TODO jogo encerrado virava "scheduled",
+// o que impedia a pontuação e permitia palpites em jogo já terminado.)
 function mapStatus(apiStatus) {
-  const s = String(apiStatus || "").toLowerCase();
-  if (s === "andamento" || s === "live" || s === "em_andamento") return "live";
-  if (s === "encerrada" || s === "encerrado" || s === "finalizada" || s === "finished") return "finished";
-  if (s === "adiada" || s === "adiado" || s === "postponed") return "postponed";
-  if (s === "cancelada" || s === "cancelado" || s === "cancelled") return "cancelled";
+  const s = String(apiStatus || "").toLowerCase().trim();
+  if (!s) return "scheduled";
+  if (["andamento", "live", "em_andamento", "em andamento"].includes(s)) return "live";
+  if (["finalizado", "finalizada", "encerrado", "encerrada", "finished"].includes(s)) return "finished";
+  if (["adiado", "adiada", "postponed"].includes(s)) return "postponed";
+  if (["cancelado", "cancelada", "cancelled", "canceled"].includes(s)) return "cancelled";
   return "scheduled";
 }
 
@@ -58,9 +65,18 @@ function extractMatches(detail) {
 
 function pickTargetRound(list) {
   if (!Array.isArray(list) || !list.length) return null;
-  const live = list.find((r) => String(r.status).toLowerCase() === "andamento");
+  const st = (r) => String(r.status || "").toLowerCase();
+  const live = list.find((r) => st(r) === "andamento");
   if (live) return live;
-  const scheduled = list.find((r) => String(r.status).toLowerCase() === "agendada");
+  // Rodada atual = a que vem DEPOIS da última rodada encerrada. A própria API
+  // informa essa rodada via "proxima_rodada" da última encerrada, o que evita
+  // cair em rodadas antigas "agendada" (jogos adiados/reagendados, ex. rodada 4).
+  const lastFinished = [...list].reverse().find((r) => st(r) === "encerrada");
+  if (lastFinished && lastFinished.proxima_rodada && lastFinished.proxima_rodada.rodada != null) {
+    const next = list.find((r) => Number(r.rodada) === Number(lastFinished.proxima_rodada.rodada));
+    if (next) return next;
+  }
+  const scheduled = list.find((r) => st(r) === "agendada");
   if (scheduled) return scheduled;
   return list[list.length - 1];
 }
@@ -92,8 +108,10 @@ async function syncRound(forceNumber) {
     { upsert: true, new: true }
   );
 
+  // Só considera jogos com data divulgada — jogo sem data não pode fechar a rodada.
   let latestAt = null;
   for (const m of items) {
+    if (!m.startsAt) continue;
     const t = new Date(m.startsAt).getTime();
     if (Number.isFinite(t) && (!latestAt || t > latestAt)) latestAt = t;
   }
@@ -142,4 +160,4 @@ async function applyLive(liveItems) {
   return { updated };
 }
 
-module.exports = { syncRound, applyLive, pickTargetRound, mapMatch };
+module.exports = { syncRound, applyLive, pickTargetRound, mapMatch, mapStatus, toDate };

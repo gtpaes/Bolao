@@ -48,6 +48,9 @@ export async function login({ email, password }) {
     username: u.username || "",
     email: u.email || email,
   };
+  // Persiste a sessão para o index.html poder ler no reload da página
+  set(SESSION_KEY, session);
+  set(PROFILE_KEY, { username: session.username, email: session.email });
   return { ok: true, data: session };
 }
 

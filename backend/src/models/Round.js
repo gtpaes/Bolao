@@ -9,7 +9,8 @@ const matchSchema = new Schema(
     awayShort: { type: String, default: "" },
     homeCrest: { type: String, default: "" },
     awayCrest: { type: String, default: "" },
-    startsAt: { type: Date, required: true },
+    // null = a API-Futebol ainda não divulgou a data deste jogo ("a definir").
+    startsAt: { type: Date, default: null },
     status: {
       type: String,
       enum: ["scheduled", "live", "finished", "postponed", "cancelled"],
@@ -32,6 +33,9 @@ const roundSchema = new Schema(
     providerStatus: { type: String, default: "agendada" },
     status: { type: String, enum: ["open", "closed", "finished"], default: "open", index: true },
     deadline: { type: Date, default: null, index: true },
+    // Janela estendida para jogos adiados movidos para esta rodada
+    extendedDeadline: { type: Date, default: null },
+    extendedMatchIds: [{ type: Number }],
     matches: { type: [matchSchema], default: [] },
     source: { type: String, default: "api-futebol" },
     syncedAt: { type: Date, default: null },
@@ -41,5 +45,6 @@ const roundSchema = new Schema(
 
 roundSchema.index({ status: 1, number: 1 });
 roundSchema.index({ "matches.externalId": 1 });
+roundSchema.index({ extendedDeadline: 1 });
 
 module.exports = model("Round", roundSchema);

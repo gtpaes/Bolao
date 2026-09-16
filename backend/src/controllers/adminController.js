@@ -14,7 +14,7 @@ async function overview(req, res, next) {
       Ticket.countDocuments(),
       Payment.aggregate([{ $match: { status: "approved" } }, { $group: { _id: null, total: { $sum: "$amountCents" } } }]),
     ]);
-    const current = await Round.findOne({ status: { $in: ["open", "closed"] } }).sort({ number: -1 }).lean();
+    const current = await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
     return res.json({
       users, rounds, tickets,
       revenueCents: (revenue[0] && revenue[0].total) || 0,
