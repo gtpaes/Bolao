@@ -11,11 +11,15 @@ const swaggerSpec = require("./docs/swagger");
 const path = require("path");
 const FRONTEND_DIR = ["frontend", "docs"].map((d) => path.join(__dirname, "..", "..", d)).find((p) => require("fs").existsSync(p)) || path.join(__dirname, "..", "..", "docs");
 
+// CORS configuration for bolao backend
+const corsOptions = require("./config/cors");
+
 function createApp() {
   const app = express();
   app.disable("x-powered-by");
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
-  app.use(cors({ origin: config.frontendOrigins, credentials: false }));
+  app.use(cors(corsOptions));
+
   app.use(express.json({ limit: "512kb" }));
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeaders: true, legacyHeaders: false }));
 

@@ -8,10 +8,23 @@ function num(name, fallback) {
 const config = {
   port: num("PORT", 3001),
   nodeEnv: process.env.NODE_ENV || "development",
-  frontendUrl: process.env.FRONTEND_URL || "http://localhost:8080",
-  // Origens permitidas para CORS (separadas por vírgula).
-  frontendOrigins: String(process.env.FRONTEND_URL || "http://localhost:8080,http://localhost:5500,http://127.0.0.1:5500")
-    .split(",").map((s) => s.trim()).filter(Boolean),
+  frontendUrl: process.env.FRONTEND_URL || "",
+  // Dominio(s) permitido(s) pelo CORS.
+  // - Se FRONTEND_URL for definido, usa só essas origens (separadas por vírgula).
+  // - Se não for definido e o ambiente for produção, aceita qualquer origem (*).
+  // - Em desenvolvimento, usa os origens de localhost por padrão.
+  frontendOrigins: (
+    process.env.FRONTEND_URL
+      ? String(process.env.FRONTEND_URL)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : /* produção sem FRONTEND_URL explícito */ config.nodeEnv === "production"
+        ? true
+        : /* desenvolvimento */ ["http://localhost:8080", "http://localhost:5500", "http://127.0.0.1:5500"]
+            .map((s) => s.trim())
+            .filter(Boolean)
+  ),
   mongodbUri: process.env.MONGODB_URI || "",
   jwtSecret: process.env.JWT_SECRET || "dev-secret-troque-em-producao",
   jwtExpiration: process.env.JWT_EXPIRATION || "8h",
