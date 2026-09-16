@@ -6,7 +6,7 @@ const { startJobs } = require("./services/scheduler");
 
 async function main() {
   await connectDb();
-  if (process.env.SKIP_JOBS !== "1") startJobs();
+  startJobs();
   const app = createApp();
   app.listen(config.port, () => {
     logger.info(`bolao-backend ouvindo em :${config.port} (${config.nodeEnv})`);

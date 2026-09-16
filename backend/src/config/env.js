@@ -31,6 +31,8 @@ const config = {
     sandbox: String(process.env.MP_SANDBOX || "true") === "true",
     enabled: Boolean(process.env.MP_ACCESS_TOKEN),
   },
+  // Só um ambiente deve rodar os jobs (sync/ao-vivo/fechamento) contra o banco.
+  enableSchedulers: String(process.env.ENABLE_SCHEDULERS || "true") === "true",
 };
 
 module.exports = config;

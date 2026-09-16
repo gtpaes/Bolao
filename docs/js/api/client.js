@@ -17,21 +17,25 @@
 
 /**
  * Resolve a base da API:
- * - Servido pelo próprio backend (porta 3001): mesma origem, "/api".
- * - Servido por outro servidor (Live Server etc.) ou aberto por arquivo:
- *   aponta para o backend local. Pode ser sobrescrito com window.API_BASE.
+ * - Override manual via window.API_BASE (útil para testes).
+ * - Backend servindo o próprio frontend (porta 3001): mesma origem, "/api".
+ * - Localhost (Live Server :5500, arquivo, etc.): backend LOCAL (localhost:3001).
+ * - Frontend publicado (GitHub Pages, Render static): backend remoto (Render).
+ * Local e produção compartilham apenas o MongoDB Atlas.
  */
 function resolveBaseURL() {
   if (typeof window !== "undefined" && window.API_BASE) return String(window.API_BASE).replace(/\/$/, "");
-  if (typeof window === "undefined") return "http://localhost:3001/api";
-  const { protocol, port } = window.location;
-  if (protocol === "file:") return API_URL_REMOTO || "http://localhost:3001/api";
+  if (typeof window === "undefined") return LOCAL_API;
+  const { protocol, hostname, port } = window.location;
+  const isLocal = protocol === "file:" || hostname === "localhost" || hostname === "127.0.0.1";
   if (port === "3001") return "/api";
-  // Frontend em outro servidor (ex.: Live Server :5500): usa o backend remoto (Render) quando configurado.
-  return API_URL_REMOTO || "http://localhost:3001/api";
+  if (isLocal) return LOCAL_API;
+  return API_URL_REMOTO || LOCAL_API;
 }
 
-/** URL do backend hospedado (Render). Preencha com algo como "https://bolao-backend.onrender.com/api". */
+/** Backend local. */
+const LOCAL_API = "http://localhost:3001/api";
+/** Backend hospedado (Render), usado só quando o frontend está no ar. */
 const API_URL_REMOTO = "https://bolao-tgup.onrender.com/api";
 
 export const API = {

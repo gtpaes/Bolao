@@ -9,6 +9,12 @@ const Round = require("../models/Round");
 let liveTimer = null;
 
 function startJobs() {
+  // Local e produção compartilham o mesmo Atlas: apenas UM ambiente roda os jobs
+  // (evita consumir a cota da API-Futebol em dobro e processar em paralelo).
+  if (!config.enableSchedulers) {
+    logger.info("jobs desativados (ENABLE_SCHEDULERS=false) — use POST /api/admin/sync/round para sincronizar manualmente");
+    return;
+  }
   // Sync da rodada a cada N minutos.
   cron.schedule(`*/${config.football.roundPollMinutes} * * * *`, async () => {
     try {
