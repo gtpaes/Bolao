@@ -1,0 +1,49 @@
+<!-- Template: user dashboard (cargado por js/pages/user.js) -->
+<section class="hero" data-host="hero"></section>
+
+<div id="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:var(--space-4);margin-top:var(--space-5)" data-host="stats">
+  <div class="card skeleton" style="height:120px"></div>
+  <div class="card skeleton" style="height:120px"></div>
+  <div class="card skeleton" style="height:120px"></div>
+  <div class="card skeleton" style="height:120px"></div>
+  <div class="card skeleton" style="height:120px"></div>
+</div>
+
+<div class="grid" style="grid-template-columns:2fr 1fr; gap:var(--space-5)">
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title"><i data-lucide="calendar-clock"></i> Rodada atual</h2>
+        <a href="#/round" class="btn-link">Ver rodada</a>
+      </div>
+      <div class="card-body" data-host="round-matches"></div>
+    </div>
+
+    <div class="card" style="margin-top:var(--space-5)">
+      <div class="card-header">
+        <h2 class="card-title"><i data-lucide="radio"></i> Jogos ao vivo</h2>
+        <a href="#/live" class="btn-link">Ver todos</a>
+      </div>
+      <div class="card-body" data-host="live"></div>
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <h2 class="card-title"><i data-lucide="zap"></i> Atalhos</h2>
+      <div class="card-body stack">
+        <a class="btn btn-primary btn-block" href="#/picks">Fazer palpites</a>
+        <a class="btn btn-ghost btn-block" href="#/buy">Comprar tickets</a>
+        <a class="btn btn-ghost btn-block" href="#/ranking">Ranking</a>
+      </div>
+    </div>
+    <div class="card" style="text-align:center; margin-top:var(--space-5)">
+      <div class="scoring-grid" data-ttl="Regras rápidas">
+        <div class="li"><span class="li-key">Placar exato</span><span class="li-val th-pts">10</span></div>
+        <div class="li"><span class="li-key">Empate correto</span><span class="li-val th-pts">6</span></div>
+        <div class="li"><span class="li-key">Vencedor correto</span><span class="li-val th-pts">4</span></div>
+        <div class="li"><span class="li-key">Erro</span><span class="li-val th-pts">0</span></div>
+      </div>
+      <a href="#/round" class="btn-link" style="margin-top:var(--space-3)">Ver regras completas</a>
+    </div>
+  </div>
+</div>

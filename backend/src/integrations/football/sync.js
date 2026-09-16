@@ -1,0 +1,145 @@
+const config = require("../../config/env");
+const logger = require("../../config/logger");
+const Round = require("../../models/Round");
+const { listRounds, getRoundDetail } = require("./client");
+
+// Converte "30/05/2026" + "16:00" (ou ISO) em Date.
+function toDate(item) {
+  if (item.data_realizacao_iso) {
+    const d = new Date(item.data_realizacao_iso);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  if (item.data_realizacao && item.hora_realizacao) {
+    const [dd, mm, yyyy] = String(item.data_realizacao).split("/").map(Number);
+    const [hh, mi] = String(item.hora_realizacao).split(":").map(Number);
+    const d = new Date(yyyy, (mm || 1) - 1, dd || 1, hh || 0, mi || 0);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
+
+function mapStatus(apiStatus) {
+  const s = String(apiStatus || "").toLowerCase();
+  if (s === "andamento" || s === "live" || s === "em_andamento") return "live";
+  if (s === "encerrada" || s === "encerrado" || s === "finalizada" || s === "finished") return "finished";
+  if (s === "adiada" || s === "adiado" || s === "postponed") return "postponed";
+  if (s === "cancelada" || s === "cancelado" || s === "cancelled") return "cancelled";
+  return "scheduled";
+}
+
+function mapMatch(item) {
+  const home = item.time_mandante || {};
+  const away = item.time_visitante || {};
+  const status = mapStatus(item.status);
+  return {
+    externalId: Number(item.partida_id),
+    home: home.nome_popular || home.nome || "Mandante",
+    away: away.nome_popular || away.nome || "Visitante",
+    homeShort: home.sigla || "",
+    awayShort: away.sigla || "",
+    homeCrest: home.escudo || "",
+    awayCrest: away.escudo || "",
+    startsAt: toDate(item),
+    status,
+    homeScore: item.placar_mandante != null ? Number(item.placar_mandante) : null,
+    awayScore: item.placar_visitante != null ? Number(item.placar_visitante) : null,
+    penalty: Boolean(item.disputa_penalti && item.disputa_penalti !== false),
+    stadium: (item.estadio && item.estadio.nome_popular) || "",
+  };
+}
+
+function extractMatches(detail) {
+  if (Array.isArray(detail)) return detail;
+  if (detail && Array.isArray(detail.partidas)) return detail.partidas;
+  if (detail && Array.isArray(detail.jogos)) return detail.jogos;
+  if (detail && Array.isArray(detail.matches)) return detail.matches;
+  return [];
+}
+
+function pickTargetRound(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  const live = list.find((r) => String(r.status).toLowerCase() === "andamento");
+  if (live) return live;
+  const scheduled = list.find((r) => String(r.status).toLowerCase() === "agendada");
+  if (scheduled) return scheduled;
+  return list[list.length - 1];
+}
+// Sincroniza a rodada atual (ou a informada) preservando o deadline do admin.
+async function syncRound(forceNumber) {
+  const list = await listRounds();
+  let target = null;
+  if (forceNumber != null) {
+    target = list.find((r) => Number(r.rodada) === Number(forceNumber)) || null;
+  } else {
+    target = pickTargetRound(list);
+  }
+  if (!target) return { synced: false, reason: "no-round" };
+
+  const detail = await getRoundDetail(config.football.campeonatoId, target.rodada);
+  const items = extractMatches(detail).map(mapMatch).filter((m) => Number.isFinite(m.externalId));
+  if (!items.length) logger.warn({ rodada: target.rodada }, "detalhe da rodada sem jogos mapeáveis");
+
+  const existing = await Round.findOne({ number: Number(target.rodada) });
+  const prevDeadline = existing ? existing.deadline : null;
+  const prevStatus = existing ? existing.status : null;
+  const finishedCount = items.filter((m) => m.status === "finished").length;
+  const providerStatus = String(target.status || "").toLowerCase();
+  const autoStatus = finishedCount && finishedCount === items.length ? "finished" : providerStatus === "encerrada" ? "finished" : "open";
+
+  const doc = await Round.findOneAndUpdate(
+    { number: Number(target.rodada) },
+    { $set: { name: target.nome || `${target.rodada}ª Rodada`, slug: target.slug || "", providerStatus: target.status || "", status: prevStatus === "closed" ? "closed" : autoStatus, deadline: prevDeadline, matches: items, source: "api-futebol", syncedAt: new Date() } },
+    { upsert: true, new: true }
+  );
+
+  let latestAt = null;
+  for (const m of items) {
+    const t = new Date(m.startsAt).getTime();
+    if (Number.isFinite(t) && (!latestAt || t > latestAt)) latestAt = t;
+  }
+
+  let advancedTo = null;
+  if (doc.status === "finished" && target.proxima_rodada && target.proxima_rodada.rodada != null) {
+    try {
+      const nextDetail = await getRoundDetail(config.football.campeonatoId, target.proxima_rodada.rodada);
+      const nextItems = extractMatches(nextDetail).map(mapMatch).filter((m) => Number.isFinite(m.externalId));
+      if (nextItems.length) {
+        await Round.findOneAndUpdate(
+          { number: Number(target.proxima_rodada.rodada) },
+          { $set: { name: target.proxima_rodada.nome || `${target.proxima_rodada.rodada}ª Rodada`, slug: target.proxima_rodada.slug || "", providerStatus: target.proxima_rodada.status || "agendada", status: "open", matches: nextItems, source: "api-futebol", syncedAt: new Date() }, $setOnInsert: { deadline: null } },
+          { upsert: true, new: true }
+        );
+        advancedTo = Number(target.proxima_rodada.rodada);
+      }
+    } catch (e) {
+      logger.warn({ err: String(e && e.message) }, "falha ao avançar para próxima rodada");
+    }
+  }
+  return { synced: true, round: doc.number, matches: items.length, finished: finishedCount, latestAt, advancedTo };
+}
+
+// Aplica o placar ao vivo (filtrado pelo campeonato) nos jogos salvos.
+async function applyLive(liveItems) {
+  const mine = (liveItems || []).filter((it) => Number(it && it.campeonato && it.campeonato.campeonato_id) === Number(config.football.campeonatoId));
+  if (!mine.length) return { updated: 0 };
+  const byId = new Map(mine.map((it) => [Number(it.partida_id), it]));
+  const rounds = await Round.find({ status: "open", "matches.status": { $in: ["scheduled", "live"] } }).sort({ number: -1 }).limit(3);
+  let updated = 0;
+  for (const r of rounds) {
+    let changed = false;
+    for (const m of r.matches) {
+      const it = byId.get(Number(m.externalId));
+      if (!it) continue;
+      m.status = "live";
+      if (it.placar_mandante != null) m.homeScore = Number(it.placar_mandante);
+      if (it.placar_visitante != null) m.awayScore = Number(it.placar_visitante);
+      m.penalty = Boolean(it.disputa_penalti && it.disputa_penalti !== false);
+      changed = true;
+      updated += 1;
+    }
+    if (changed) { r.syncedAt = new Date(); await r.save(); }
+  }
+  return { updated };
+}
+
+module.exports = { syncRound, applyLive, pickTargetRound, mapMatch };

@@ -1,0 +1,38 @@
+<!-- Template: Comprar Tickets -->
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Comprar Tickets</h1>
+    <p class="page-sub">Ticket de R$ 10,00 para participar da rodada com palpites próprios.</p>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: 1.4fr 1fr; gap:var(--space-5)">
+  <div class="card">
+    <div class="card-header"><h2 class="card-title"><i data-lucide="ticket"></i> Quantidade</h2></div>
+    <div class="card-body">
+      <div class="price-qty">
+        <button class="qty-btn" id="qty-minus" aria-label="Diminuir"><i data-lucide="minus"></i></button>
+        <span class="qty-num" id="qty-value">1</span>
+        <button class="qty-btn" id="qty-plus" aria-label="Aumentar"><i data-lucide="plus"></i></button>
+      </div>
+      <div class="li" style="margin-top:var(--space-5)"><span class="li-key">Valor por ticket</span><span class="li-val" id="unit-price">R$ 10,00</span></div>
+      <div class="li"><span class="li-key">Quantidade</span><span class="li-val" id="qty-summary">1</span></div>
+      <div class="li"><span class="li-key t-bold">Total</span><span class="li-val" id="total-price" style="font-size:1.4rem;font-weight:800">R$ 10,00</span></div>
+      <div class="divider"></div>
+      <p class="t-small t-muted">O pagamento ocorre via Pix na etapa seguinte.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="card-title"><i data-lucide="info"></i> Como funciona</h2>
+    <div class="card-body stack">
+      <div class="li"><span class="li-key">1</span><span class="li-val">Defina a quantidade</span></div>
+      <div class="li"><span class="li-key">2</span><span class="li-val">Pague via Pix</span></div>
+      <div class="li"><span class="li-key">3</span><span class="li-val">Faça os palpites</span></div>
+      <div class="li"><span class="li-key">4</span><span class="li-val">Acompanhe o ranking</span></div>
+    </div>
+    <div class="card-footer">
+      <a class="btn btn-primary btn-lg btn-block" href="#/payment" id="go-payment" data-buy-qty="1">Continuar para pagamento</a>
+    </div>
+  </div>
+</div>

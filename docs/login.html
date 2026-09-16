@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Acesse o Bolão de futebol." />
+  <title>Entrar · Bolão de futebol</title>
+  <link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
+  <link rel="stylesheet" href="css/auth.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="auth-shell">
+    <!-- Painel lateral -->
+    <aside class="auth-aside" aria-hidden="true">
+      <div class="aside-brand">
+        <span class="logo-mark"><i data-lucide="trophy"></i></span>
+        <span class="logo-text">Bolão</span>
+      </div>
+      <div class="aside-copy">
+        <h2>Palpites da rodada</h2>
+        <p>Compre tickets, faça seus palpites e dispute o ranking da rodada. Placar exato, empate e vencedor valem pontos em cada rodada.</p>
+      </div>
+      <div class="aside-points">
+        <div class="aside-point"><span class="ap-ico"><i data-lucide="target"></i></span><div><b>Palpites da rodada</b><span>Defina os placares antes do fechamento.</span></div></div>
+        <div class="aside-point"><span class="ap-ico"><i data-lucide="list-ordered"></i></span><div><b>Ranking ao vivo</b><span>Acompanhe sua posição e pontuação.</span></div></div>
+        <div class="aside-point"><span class="ap-ico"><i data-lucide="radio"></i></span><div><b>Jogos ao vivo</b><span>Siga os jogos em andamento de futebol.</span></div></div>
+      </div>
+    </aside>
+
+    <!-- Formulário -->
+    <main class="auth-main">
+      <div class="auth-card">
+        <a class="auth-logo" href="login.html" style="text-decoration:none">
+          <span class="logo-mark"><i data-lucide="trophy"></i></span>
+          <span class="logo-text">Bolão</span>
+        </a>
+        <h1 class="auth-heading">Entrar</h1>
+        <p class="auth-sub">Acesse sua conta para continuar.</p>
+
+        <form id="login-form" novalidate>
+          <div class="field" id="f-email">
+            <label for="email">E-mail</label>
+            <input class="input" type="email" id="email" name="email" autocomplete="email" placeholder="voce@email.com" required />
+            <span class="f-error" id="err-email" hidden></span>
+          </div>
+
+          <div class="field" id="f-password">
+            <label for="password">Senha</label>
+            <div class="input-wrap">
+              <input class="input" type="password" id="password" name="password" autocomplete="current-password" placeholder="Sua senha" required />
+              <button type="button" class="icon-btn input-ico" id="toggle-pass" aria-label="Mostrar senha"><i data-lucide="eye"></i></button>
+            </div>
+            <span class="f-error" id="err-password" hidden></span>
+          </div>
+
+          <div class="auth-row">
+            <label class="check"><input type="checkbox" name="remember" id="remember" /> Manter conectado</label>
+            <a href="recover.html" class="btn-link">Esqueci minha senha</a>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg btn-block" id="submit-btn">
+            Entrar
+          </button>
+        </form>
+
+        <div class="auth-card demo-card" style="margin-top:var(--space-4)">
+          <p class="auth-sub t-small">Acesso rápido:</p>
+          <div class="row wrap" style="gap:var(--space-2)">
+            <button class="btn btn-soft btn-sm" data-demo data-demo-email="dev@bolao.local" data-demo-pass="dev12345">DEV · dev@bolao.local</button>
+            <button class="btn btn-soft btn-sm" data-demo data-demo-email="admin@bolao.local" data-demo-pass="admin12345">Admin · admin@bolao.local</button>
+          </div>
+        </div>
+
+        <div class="divider-text">Novo por aqui?</div>
+        <a class="btn btn-outline btn-lg btn-block" href="register.html">Criar conta</a>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

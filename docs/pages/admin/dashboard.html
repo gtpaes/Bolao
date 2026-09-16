@@ -1,0 +1,31 @@
+<!-- Template: Dashboard Admin -->
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Dashboard Admin</h1>
+    <p class="page-sub">Visão geral do bolão para o administrador.</p>
+  </div>
+</div>
+
+<div class="grid grid-4" id="admin-stats" data-host="stats">
+  <div class="card skeleton" style="height:104px"></div>
+  <div class="card skeleton" style="height:104px"></div>
+  <div class="card skeleton" style="height:104px"></div>
+  <div class="card skeleton" style="height:104px"></div>
+</div>
+
+<div class="grid" style="grid-template-columns:2fr 1fr; gap:var(--space-5); margin-top:var(--space-5)">
+  <div class="card">
+    <div class="card-header"><h2 class="card-title"><i data-lucide="calendar-clock"></i> Rodada atual</h2>
+      <a href="#/admin/round" class="btn-link">Gerenciar</a></div>
+    <div class="card-body" data-host="current-round"></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h2 class="card-title"><i data-lucide="activity"></i> Ações rápidas</h2></div>
+    <div class="card-body stack">
+      <a class="btn btn-primary btn-block" href="#/admin/round">Gerenciar rodada</a>
+      <a class="btn btn-ghost btn-block" href="#/admin/matches">Gerenciar jogos</a>
+      <a class="btn btn-ghost btn-block" href="#/admin/users">Usuários</a>
+      <a class="btn btn-ghost btn-block" href="#/admin/tickets">Tickets</a>
+    </div>
+  </div>
+</div>

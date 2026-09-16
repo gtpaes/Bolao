@@ -1,0 +1,5 @@
+/* auth.css — Folha agregada para as páginas públicas (login/registro/recuperar) */
+@import url("tokens.css");
+@import url("base.css");
+@import url("components.css");
+@import url("layout.css");

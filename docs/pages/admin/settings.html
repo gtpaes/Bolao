@@ -1,0 +1,30 @@
+<!-- Template: Configurações do Bolão (admin) -->
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Configurações do Bolão</h1>
+    <p class="page-sub">Regras gerais do bolão.</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h2 class="card-title"><i data-lucide="sliders-horizontal"></i> Regras de pontuação</h2></div>
+  <div class="card-body">
+    <div class="scoring-grid">
+      <div class="scoring-item"><span class="si-label">Placar exato</span><span class="si-pts">10</span></div>
+      <div class="scoring-item"><span class="si-label">Empate correto</span><span class="si-pts">6</span></div>
+      <div class="scoring-item"><span class="si-label">Vencedor correto</span><span class="si-pts">4</span></div>
+      <div class="scoring-item"><span class="si-label">Errou</span><span class="si-pts">0</span></div>
+    </div>
+    <div class="divider"></div>
+    <div class="field"><label for="cfg-price">Preço por ticket (R$)</label><input class="input" type="number" id="cfg-price" value="10.00" step="0.01" /></div>
+    <div class="field check" style="flex-direction:row;gap:var(--space-2)"><input type="checkbox" id="cfg-auto-close" checked /><label for="cfg-auto-close">Usar horário de fechamento por rodada</label></div>
+    <button class="btn btn-primary" id="cfg-save">Salvar alterações</button>
+  </div>
+</div>
+
+<div class="card" style="margin-top:var(--space-5)">
+  <div class="card-header"><h2 class="card-title"><i data-lucide="shield"></i> Segurança</h2></div>
+  <div class="card-body">
+    <p class="t-small t-muted">As permissões, o cálculo de pontos e a gestão de pagamentos seguem as regras do bolão. A interface apenas organiza os dados.</p>
+  </div>
+</div>

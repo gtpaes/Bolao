@@ -1,0 +1,139 @@
+/* ============================================================
+   tokens.css — Design tokens (variáveis) do Bolão de futebol
+   Cores: verde + branco (light) | verde + preto (dark)
+   Tema controlado via atributo [data-theme="dark"] no <html>.
+   ============================================================ */
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Brand —— verde primário */
+  --green-700: #065a2e;
+  --green-600: #0a6e38;
+  --green-500: #0f8a45;
+  --green-400: #16a35a;
+  --green-300: #2fbf76;
+  --green-50:  #e7f6ee;
+  --green-10:  #f2faf6;
+
+  /* Neutros claros (light mode) */
+  --bg:        #f4f7f5;
+  --surface:   #ffffff;
+  --surface-2: #f7faf8;
+  --ink:       #0e1712;
+  --ink-soft:  #28352e;
+  --muted:     #5b6b62;
+  --muted-2:   #84938a;
+  --border:    #e3eae5;
+  --border-2:  #d4ded7;
+
+  /* Semânticos */
+  --info:    #1d6fd1;
+  --info-bg: #e8f2fc;
+  --success: #0f8a45;
+  --success-bg: #e7f6ee;
+  --warn:    #b97b10;
+  --warn-bg: #fdf3df;
+  --danger:  #cf3a3a;
+  --danger-bg: #fdeaea;
+  --live:    #d7263d;
+
+  /* Superfícies elevadas e sombras */
+  --overlay:          rgba(10, 18, 14, 0.45);
+  --shadow-sm: 0 1px 2px rgba(14, 23, 18, 0.06), 0 1px 3px rgba(14, 23, 18, 0.05);
+  --shadow-md: 0 6px 18px rgba(14, 23, 18, 0.10), 0 2px 6px rgba(14, 23, 18, 0.06);
+  --shadow-lg: 0 20px 48px rgba(14, 23, 18, 0.16);
+  --focus-ring: 0 0 0 3px rgba(15, 138, 69, 0.35);
+
+  /* Radial "gramado" usada em placeholders / destaque */
+  --hero-top: #e5fff0;
+  --hero-bottom: #eef5f1;
+
+  --header-bg: #ffffff;
+  --sidebar-bg: #ffffff;
+  --avatar-bg: #dcece3;
+  --nav-active: var(--green-50);
+  --card-border: var(--border);
+
+  /* Formulários */
+  --input-bg: #ffffff;
+  --input-border: var(--border-2);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --green-700: #065a2e;
+  --green-600: #0a6e38;
+  --green-500: #14a353;
+  --green-400: #2fbf76;
+  --green-300: #59d095;
+  --green-50:  #10271c;
+  --green-10:  #18271f;
+
+  --bg:        #0a0e0c;
+  --surface:   #121714;
+  --surface-2: #181e1a;
+  --ink:       #e8f0ea;
+  --ink-soft:  #c3d0c6;
+  --muted:     #a0b1a6;
+  --muted-2:   #7d8f84;
+  --border:    #263129;
+  --border-2:  #33433a;
+
+  --info:       #6aa7f2;
+  --info-bg:    #13263f;
+  --success:    #3ec47a;
+  --success-bg: #0f2c1c;
+  --warn:       #e5b04b;
+  --warn-bg:    #32260f;
+  --danger:     #f16d6d;
+  --danger-bg:  #3a1616;
+  --live:       #ff4d61;
+
+  --overlay:   rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 56px rgba(0, 0, 0, 0.6);
+  --focus-ring: 0 0 0 3px rgba(47, 191, 118, 0.4);
+
+  --hero-top: #0e1a13;
+  --hero-bottom: #101612;
+
+  --header-bg: #0f1411;
+  --sidebar-bg: #0f1411;
+  --avatar-bg: #24362b;
+  --nav-active: var(--green-50);
+  --card-border: var(--border);
+
+  --input-bg: #101511;
+  --input-border: var(--border-2);
+}
+
+/* Escalas comuns em ambos os temas */
+:root {
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 44px;
+
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --sidebar-w: 252px;
+  --header-h: 64px;
+  --bottomnav-h-mobile: 64px;
+
+  --container: 1180px;
+}

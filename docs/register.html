@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Crie sua conta no Bolão." />
+  <title>Criar conta · Bolão</title>
+  <link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
+  <link rel="stylesheet" href="css/auth.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="auth-shell">
+    <aside class="auth-aside" aria-hidden="true">
+      <div class="aside-brand">
+        <span class="logo-mark"><i data-lucide="trophy"></i></span>
+        <span class="logo-text">Bolão</span>
+      </div>
+      <div class="aside-copy">
+        <h2>Participe do bolão de futebol</h2>
+        <p>Um único bolão: compre tickets, faça seus palpites e dispute o ranking em cada rodada.</p>
+      </div>
+      <div class="aside-points">
+        <div class="aside-point"><span class="ap-ico"><i data-lucide="ticket"></i></span><div><b>Ticket = R$ 10</b><span>Cada ticket participa com seus próprios palpites.</span></div></div>
+        <div class="aside-point"><span class="ap-ico"><i data-lucide="trophy"></i></span><div><b>Pontos por rodada</b><span>Placar exato, empate ou vencedor: 10/6/4/0.</span></div></div>
+      </div>
+    </aside>
+
+    <main class="auth-main">
+      <div class="auth-card">
+        <a class="auth-logo" href="login.html" style="text-decoration:none">
+          <span class="logo-mark"><i data-lucide="trophy"></i></span>
+          <span class="logo-text">Bolão</span>
+        </a>
+        <h1 class="auth-heading">Criar conta</h1>
+        <p class="auth-sub">Complete seu perfil para começar a jogar.</p>
+
+        <form id="register-form" novalidate>
+          <div class="field" id="f-username">
+            <label for="username">Nome de usuário</label>
+            <input class="input" type="text" id="username" name="username" autocomplete="username" placeholder="Ex. Maradona" required minlength="3" maxlength="30" />
+            <span class="f-error" id="err-username" hidden></span>
+          </div>
+
+          <div class="field" id="f-email">
+            <label for="email">E-mail</label>
+            <input class="input" type="email" id="email" name="email" autocomplete="email" placeholder="voce@email.com" required />
+            <span class="f-error" id="err-email" hidden></span>
+          </div>
+
+          <div class="field" id="f-password">
+            <label for="password">Senha</label>
+            <div class="input-wrap">
+              <input class="input" type="password" id="password" name="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres" required minlength="8" />
+              <button type="button" class="icon-btn input-ico" data-target="password" aria-label="Mostrar senha"><i data-lucide="eye"></i></button>
+            </div>
+            <span class="f-error" id="err-password" hidden></span>
+          </div>
+
+          <div class="field" id="f-confirm">
+            <label for="confirm">Confirmar senha</label>
+            <div class="input-wrap">
+              <input class="input" type="password" id="confirm" name="confirm" autocomplete="new-password" placeholder="Repita a senha" required minlength="8" />
+              <button type="button" class="icon-btn input-ico" data-target="confirm" aria-label="Mostrar senha"><i data-lucide="eye"></i></button>
+            </div>
+            <span class="f-error" id="err-confirm" hidden></span>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg btn-block" id="submit-btn">Criar conta</button>
+        </form>
+
+        <div class="divider-text">Já possui uma conta?</div>
+        <a class="btn btn-outline btn-lg btn-block" href="login.html">Entrar</a>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="module" src="js/register.js"></script>
+</body>
+</html>
