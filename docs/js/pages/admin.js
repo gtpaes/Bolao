@@ -6,6 +6,8 @@ import { brl, dateShort } from "../../utils/format.js";
 import { getCurrentRound, listRounds } from "../api/rounds.js";
 import { openModal } from "../../components/modal.js";
 import { toastSuccess, toastInfo, toastError } from "../../components/toast.js";
+import { request } from "../api/client.js";
+import { currentRole } from "../api/auth.js";
 
 /* ---------------- Dashboard Admin ---------------- */
 export async function adminDashboard(view) {
@@ -95,7 +97,62 @@ export async function adminUsers(view) {
   await loadTemplate(view, "admin/users.html");
   await run(view, async () => {
     const body = view.querySelector("#admin-users-body");
-    body.innerHTML = `<tr><td colspan="5">${emptyRowCell("Nenhum usuário encontrado.")}</td></tr>`;
+    const isDev = String(currentRole()) === "dev";
+
+    let users = [];
+    try {
+      const res = await request("/admin/users");
+      users = (res && res.users) || [];
+    } catch (e) {
+      users = [];
+    }
+
+    if (!users.length) {
+      body.innerHTML = `<tr><td colspan="5">${emptyRowCell("Nenhum usuário encontrado.")}</td></tr>`;
+      return;
+    }
+
+    const badge = (r) => {
+      const map = { dev: "badge", admin: "badge", user: "badge badge-muted" };
+      return `<span class="${map[r] || "badge badge-muted"}">${esc(r)}</span>`;
+    };
+
+    body.replaceChildren(...users.map((u) => {
+      const tr = document.createElement("tr");
+      const roleCell = isDev && u.role !== "dev"
+        ? `${badge(u.role)} <button class="btn btn-soft btn-sm" data-role-btn data-id="${esc(u.id)}" data-next="${u.role === "admin" ? "user" : "admin"}">${u.role === "admin" ? "Remover admin" : "Tornar admin"}</button>`
+        : badge(u.role);
+      tr.innerHTML = `
+        <td>${esc(u.username)}</td>
+        <td>${esc(u.email)}</td>
+        <td>${esc(dateShort(u.createdAt))}</td>
+        <td>${roleCell}</td>
+        <td>—</td>`;
+      return tr;
+    }));
+
+    if (isDev) {
+      body.querySelectorAll("[data-role-btn]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.id;
+          const nextRole = btn.dataset.next;
+          btn.disabled = true;
+          try {
+            const res = await request(`/admin/users/${id}/role`, { method: "PATCH", body: { role: nextRole } });
+            const u = (res && res.user) || {};
+            toastSuccess("Papel atualizado", `${u.username || "Usuário"} agora é ${u.role}.`);
+            btn.textContent = nextRole === "admin" ? "Remover admin" : "Tornar admin";
+            btn.dataset.next = nextRole === "admin" ? "user" : "admin";
+            const b = btn.previousElementSibling;
+            if (b && b.classList.contains("badge")) b.textContent = u.role;
+          } catch (e) {
+            toastError("Não foi possível atualizar", e.message || "Tente novamente.");
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+    }
   });
 }
 

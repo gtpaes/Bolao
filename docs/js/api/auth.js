@@ -29,15 +29,17 @@ export function currentRole() {
 
 /* ---------------- Registro (backend) ---------------- */
 export async function register({ username, email, password }) {
-  const data = await request("/auth/register", { method: "POST", body: { username, email, password } });
-  // O cadastro retorna conta criada; o usuário entra pela tela de login.
+  const res = await request("/auth/register", { method: "POST", body: { username, email, password } });
+  // Resposta do backend: { ok, data: { token, user } } — registrou; entrada pela tela de login.
+  const data = res && res.data ? res.data : res || {};
   return { ok: true, data: data.user || null };
 }
 
 /* ---------------- Login (backend) ---------------- */
 export async function login({ email, password }) {
   email = String(email || "").trim().toLowerCase();
-  const data = await request("/auth/login", { method: "POST", body: { email, password } });
+  const res = await request("/auth/login", { method: "POST", body: { email, password } });
+  const data = res && res.data ? res.data : res || {};
   const u = data.user || {};
   const session = {
     token: data.token,
@@ -46,14 +48,6 @@ export async function login({ email, password }) {
     username: u.username || "",
     email: u.email || email,
   };
-  set(SESSION_KEY, session);
-  set(PROFILE_KEY, {
-    id: u.id || null,
-    username: u.username || "",
-    email: u.email || email,
-    role: u.role || "user",
-    createdAt: u.createdAt || null,
-  });
   return { ok: true, data: session };
 }
 

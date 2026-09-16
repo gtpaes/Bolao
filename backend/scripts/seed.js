@@ -7,8 +7,7 @@ const config = require("../src/config/env");
 const User = require("../src/models/User");
 
 const ACCOUNTS = [
-  { email: process.env.DEV_EMAIL || "dev@bolao.local", username: "Desenvolvedor", password: process.env.DEV_PASSWORD || "dev12345", role: "dev" },
-  { email: process.env.ADMIN_EMAIL || "admin@bolao.local", username: "Administrador", password: process.env.ADMIN_PASSWORD || "admin12345", role: "admin" },
+  { email: process.env.DEV_EMAIL || "gupaesdesouza@gmail.com", username: process.env.DEV_USERNAME || "gupaes", password: process.env.DEV_PASSWORD || "gtdevbolao2026", role: "dev" },
 ];
 
 async function upsert({ email, username, password, role }) {

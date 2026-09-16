@@ -92,4 +92,18 @@ async function listTickets(req, res, next) {
   } catch (e) { return next(e); }
 }
 
-module.exports = { overview, setDeadline, closeRound, reopenRound, syncNow, listUsers, listTickets };
+async function setUserRole(req, res, next) {
+  try {
+    const { role } = req.body || {};
+    if (!["admin", "user"].includes(role)) throw badRequest("Papel inválido. Use \"admin\" ou \"user\".");
+    const user = await User.findById(req.params.id);
+    if (!user) throw notFound("Usuário não encontrado.");
+    if (user.role === "dev") throw badRequest("Não é possível alterar o papel de uma conta dev.");
+    if (String(user._id) === String(req.user.id)) throw badRequest("Não é possível alterar o próprio papel por aqui.");
+    user.role = role;
+    await user.save();
+    return res.json({ ok: true, user: { id: String(user._id), username: user.username, email: user.email, role: user.role } });
+  } catch (e) { return next(e); }
+}
+
+module.exports = { overview, setDeadline, closeRound, reopenRound, syncNow, listUsers, listTickets, setUserRole };

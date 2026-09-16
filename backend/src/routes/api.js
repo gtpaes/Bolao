@@ -54,6 +54,7 @@ router.post("/admin/rounds/:id/close", authJwt, requireRole("admin", "dev"), adm
 router.post("/admin/rounds/:id/reopen", authJwt, requireRole("admin", "dev"), adminController.reopenRound);
 router.post("/admin/sync/round", authJwt, requireRole("admin", "dev"), adminController.syncNow);
 router.get("/admin/users", authJwt, requireRole("admin", "dev"), adminController.listUsers);
+router.patch("/admin/users/:id/role", authJwt, requireRole("dev"), adminController.setUserRole);
 router.get("/admin/tickets", authJwt, requireRole("admin", "dev"), adminController.listTickets);
 
 module.exports = router;

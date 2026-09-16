@@ -73,7 +73,8 @@ function bindToggleVisibility(btn, input) {
     const show = input.type === "password";
     input.type = show ? "text" : "password";
     btn.setAttribute("aria-label", show ? "Ocultar senha" : "Mostrar senha");
-    btn.querySelector("i[data-lucide]").setAttribute("data-lucide", show ? "eye-off" : "eye");
+    const ico = btn.querySelector("i[data-lucide]") || btn.querySelector("svg[data-lucide]") || btn.firstElementChild;
+    if (ico) ico.setAttribute("data-lucide", show ? "eye-off" : "eye");
     if (window.lucide) window.lucide.createIcons({ nodes: [btn] });
   });
 }
