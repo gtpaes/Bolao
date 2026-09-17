@@ -36,7 +36,7 @@ function resolveBaseURL() {
 /** Backend local. */
 const LOCAL_API = "http://localhost:3001/api";
 /** Backend hospedado (Render), usado só quando o frontend está no ar. */
-const API_URL_REMOTO = "https://bolao-tgup.onrender.com/api";
+const API_URL_REMOTO = "https://bolao-api-00mh.onrender.com/api";
 
 export const API = {
   baseURL: resolveBaseURL(),
