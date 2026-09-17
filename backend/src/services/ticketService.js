@@ -106,7 +106,7 @@ async function savePicks(userId, ticketId, picks) {
   for (const p of picks) {
     const extId = Number(p.matchId);
     const m = byExternal.get(extId);
-    if (!m) throw badRequest("Jogo inválido para esta rodada.");
+    if (!m || m.enabledForTickets === false) throw badRequest("Jogo não selecionado para esta rodada.");
     if (m.status !== "scheduled") {
       const err = forbidden("Este jogo já começou e não aceita mais palpites.", "MATCH_STARTED");
       throw err;

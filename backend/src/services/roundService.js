@@ -66,6 +66,7 @@ function toMatchDTO(m) {
     live,
     home_score: o.homeScore,
     away_score: o.awayScore,
+    enabled_for_tickets: o.enabledForTickets !== false,
   };
 }
 
@@ -120,6 +121,12 @@ async function listMatches(roundId) {
       : await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
   }
   if (!round) return [];
+  return (round.matches || []).filter((match) => match.enabledForTickets !== false).map(toMatchDTO);
+}
+
+async function listAdminMatches(roundId) {
+  const round = await Round.findById(roundId).lean();
+  if (!round) return null;
   return (round.matches || []).map(toMatchDTO);
 }
 
@@ -137,4 +144,4 @@ async function listLive() {
   return out;
 }
 
-module.exports = { getCurrentRound, listRounds, getRound, listMatches, listLive, toRoundDTO, toMatchDTO };
+module.exports = { getCurrentRound, listRounds, getRound, listMatches, listAdminMatches, listLive, toRoundDTO, toMatchDTO };

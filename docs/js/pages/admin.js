@@ -74,7 +74,56 @@ export async function adminMatches(view) {
   await loadTemplate(view, "admin/matches.html");
   await run(view, async () => {
     const host = view.querySelector('[data-host="admin-matches"]');
-    host.replaceChildren(stateNode("off", { title: "Jogos da rodada", message: "Nenhum jogo cadastrado." }));
+    let round = null;
+    try {
+      await request("/admin/sync/round", { method: "POST", body: {} });
+      round = (await getCurrentRound()).round;
+    } catch (e) {
+      host.replaceChildren(stateNode("error", { title: "Não foi possível sincronizar", message: e.message || "Verifique a API de futebol." }));
+      return;
+    }
+    if (!round) {
+      host.replaceChildren(stateNode("empty", { title: "Nenhuma rodada encontrada", message: "Sincronize uma rodada antes de selecionar os jogos." }));
+      return;
+    }
+    let matches = [];
+    try {
+      matches = (await request(`/admin/rounds/${round.id}/matches`)).matches || [];
+    } catch (e) {
+      host.replaceChildren(stateNode("error", { title: "Não foi possível carregar os jogos", message: e.message || "Tente novamente." }));
+      return;
+    }
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<div class="card-header"><h2 class="card-title">Rodada ${esc(round.number)} — selecione os jogos do ticket</h2></div><div class="card-body"><div data-match-list></div><button class="btn btn-primary" data-save-matches><i data-lucide="save"></i> Salvar jogos selecionados</button></div>`;
+    const list = card.querySelector("[data-match-list]");
+    if (!matches.length) {
+      list.appendChild(stateNode("empty", { title: "Nenhum jogo encontrado", message: "A API ainda não retornou jogos para esta rodada." }));
+    } else {
+      for (const match of matches) {
+        const label = document.createElement("label");
+        label.className = "field";
+        label.style.display = "flex";
+        label.style.alignItems = "center";
+        label.style.gap = "var(--space-3)";
+        label.innerHTML = `<input type="checkbox" value="${esc(match.externalId)}" ${match.enabled_for_tickets ? "checked" : ""} /><span>${esc(match.home)} x ${esc(match.away)}</span><span class="t-muted t-small">${esc(match.status || "")}</span>`;
+        list.appendChild(label);
+      }
+    }
+    host.replaceChildren(card);
+    card.querySelector("[data-save-matches]").addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const matchIds = [...list.querySelectorAll("input[type=checkbox]:checked")].map((input) => Number(input.value));
+        const result = await request(`/admin/rounds/${round.id}/matches`, { method: "PATCH", body: { matchIds } });
+        toastSuccess("Jogos salvos", `${result.selectedCount} jogo(s) entrarão nos tickets.`);
+      } catch (e) {
+        toastError("Não foi possível salvar", e.message || "Tente novamente.");
+      } finally {
+        button.disabled = false;
+      }
+    });
 
     view.querySelector("#admin-add-match").addEventListener("click", () => {
       const body = document.createElement("div");

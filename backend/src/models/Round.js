@@ -9,6 +9,7 @@ const matchSchema = new Schema(
     awayShort: { type: String, default: "" },
     homeCrest: { type: String, default: "" },
     awayCrest: { type: String, default: "" },
+    enabledForTickets: { type: Boolean, default: true },
     // null = a API-Futebol ainda não divulgou a data deste jogo ("a definir").
     startsAt: { type: Date, default: null },
     status: {

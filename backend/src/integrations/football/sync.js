@@ -111,6 +111,14 @@ async function syncRound(forceNumber) {
   if (!items.length) logger.warn({ rodada: target.rodada }, "detalhe da rodada sem jogos mapeáveis");
 
   const existing = await Round.findOne({ number: Number(target.rodada) });
+  const enabledByExternalId = new Map(
+    (existing && existing.matches || []).map((match) => [Number(match.externalId), match.enabledForTickets !== false]),
+  );
+  for (const match of items) {
+    match.enabledForTickets = enabledByExternalId.has(Number(match.externalId))
+      ? enabledByExternalId.get(Number(match.externalId))
+      : true;
+  }
   const prevDeadline = existing ? existing.deadline : null;
   const prevStatus = existing ? existing.status : null;
   const finishedCount = items.filter((m) => m.status === "finished").length;
@@ -136,6 +144,15 @@ async function syncRound(forceNumber) {
     try {
       const nextDetail = await getRoundDetail(config.football.campeonatoId, target.proxima_rodada.rodada);
       const nextItems = extractMatches(nextDetail).map(mapMatch).filter((m) => Number.isFinite(m.externalId));
+      const nextExisting = await Round.findOne({ number: Number(target.proxima_rodada.rodada) });
+      const nextEnabledByExternalId = new Map(
+        (nextExisting && nextExisting.matches || []).map((match) => [Number(match.externalId), match.enabledForTickets !== false]),
+      );
+      for (const match of nextItems) {
+        match.enabledForTickets = nextEnabledByExternalId.has(Number(match.externalId))
+          ? nextEnabledByExternalId.get(Number(match.externalId))
+          : true;
+      }
       if (nextItems.length) {
         await Round.findOneAndUpdate(
           { number: Number(target.proxima_rodada.rodada) },

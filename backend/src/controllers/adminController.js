@@ -69,6 +69,23 @@ async function syncNow(req, res, next) {
   } catch (e) { return next(e); }
 }
 
+async function setRoundMatches(req, res, next) {
+  try {
+    const { matchIds } = req.body || {};
+    if (!Array.isArray(matchIds)) throw badRequest("Informe a lista de jogos selecionados.");
+    const round = await Round.findById(req.params.id);
+    if (!round) throw notFound("Rodada não encontrada.");
+    const selected = new Set(matchIds.map((id) => Number(id)).filter(Number.isFinite));
+    let selectedCount = 0;
+    for (const match of round.matches) {
+      match.enabledForTickets = selected.has(Number(match.externalId));
+      if (match.enabledForTickets) selectedCount += 1;
+    }
+    await round.save();
+    return res.json({ ok: true, roundId: String(round._id), selectedCount });
+  } catch (e) { return next(e); }
+}
+
 async function listUsers(req, res, next) {
   try {
     const users = await User.find({}).sort({ createdAt: -1 }).limit(200).lean();
@@ -106,4 +123,4 @@ async function setUserRole(req, res, next) {
   } catch (e) { return next(e); }
 }
 
-module.exports = { overview, setDeadline, closeRound, reopenRound, syncNow, listUsers, listTickets, setUserRole };
+module.exports = { overview, setDeadline, closeRound, reopenRound, syncNow, setRoundMatches, listUsers, listTickets, setUserRole };

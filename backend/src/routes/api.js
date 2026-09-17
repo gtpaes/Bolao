@@ -30,6 +30,7 @@ router.get("/rounds", authJwt, roundController.list);
 router.get("/rounds/:id", authJwt, roundController.get);
 router.get("/matches", authJwt, roundController.matches);
 router.get("/matches/live", authJwt, roundController.live);
+router.get("/admin/rounds/:id/matches", authJwt, requireRole("admin", "dev"), roundController.adminMatches);
 
 // Tickets
 router.get("/tickets", authJwt, ticketController.list);
@@ -53,6 +54,7 @@ router.patch("/admin/rounds/:id/deadline", authJwt, requireRole("admin", "dev"),
 router.post("/admin/rounds/:id/close", authJwt, requireRole("admin", "dev"), adminController.closeRound);
 router.post("/admin/rounds/:id/reopen", authJwt, requireRole("admin", "dev"), adminController.reopenRound);
 router.post("/admin/sync/round", authJwt, requireRole("admin", "dev"), adminController.syncNow);
+router.patch("/admin/rounds/:id/matches", authJwt, requireRole("admin", "dev"), adminController.setRoundMatches);
 router.get("/admin/users", authJwt, requireRole("admin", "dev"), adminController.listUsers);
 router.patch("/admin/users/:id/role", authJwt, requireRole("dev"), adminController.setUserRole);
 router.get("/admin/tickets", authJwt, requireRole("admin", "dev"), adminController.listTickets);
