@@ -96,17 +96,33 @@ function pickTargetRound(list) {
   return lastFinished || ordered[ordered.length - 1];
 }
 // Sincroniza a rodada atual (ou a informada) preservando o deadline do admin.
+async function resolveRoundNumber(forceNumber) {
+  if (forceNumber != null && Number.isFinite(Number(forceNumber)) && Number(forceNumber) > 0) {
+    return Number(forceNumber);
+  }
+  const latest = await Round.findOne({ status: { $in: ["open", "closed", "finished"] } })
+    .sort({ number: -1 })
+    .select({ number: 1 })
+    .lean();
+  return latest ? Number(latest.number) : config.football.roundNumber;
+}
+
 async function syncRound(forceNumber) {
-  const list = await listRounds();
+  const roundNumber = await resolveRoundNumber(forceNumber);
   let target = null;
-  if (forceNumber != null) {
-    target = list.find((r) => Number(r.rodada) === Number(forceNumber)) || null;
+  let detail = null;
+  if (Number.isFinite(roundNumber) && roundNumber > 0) {
+    detail = await getRoundDetail(config.football.campeonatoId, roundNumber);
+    target = detail && Number.isFinite(Number(detail.rodada))
+      ? detail
+      : { rodada: roundNumber, status: "agendada" };
   } else {
+    const list = await listRounds();
     target = pickTargetRound(list);
   }
   if (!target) return { synced: false, reason: "no-round" };
 
-  const detail = await getRoundDetail(config.football.campeonatoId, target.rodada);
+  if (!detail) detail = await getRoundDetail(config.football.campeonatoId, target.rodada);
   const items = extractMatches(detail).map(mapMatch).filter((m) => Number.isFinite(m.externalId));
   if (!items.length) logger.warn({ rodada: target.rodada }, "detalhe da rodada sem jogos mapeáveis");
 

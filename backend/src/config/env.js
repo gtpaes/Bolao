@@ -40,6 +40,7 @@ const config = {
     baseUrl: (process.env.FOOTBALL_API_BASE_URL || "https://api.api-futebol.com.br/v1").replace(/\/$/, ""),
     apiKey: secret("FOOTBALL_API_KEY"),
     campeonatoId: num("FOOTBALL_CAMPEONATO_ID", 10),
+    roundNumber: num("FOOTBALL_ROUND_NUMBER", 28),
     roundPollMinutes: Math.max(5, num("FOOTBALL_ROUND_POLL_MINUTES", 30)),
     // A cota da API-Futebol e limitada; nunca consultar ao vivo a cada 30s.
     // 10 minutos e o padrao, com piso de 5 minutos mesmo se o ambiente antigo
