@@ -84,8 +84,9 @@ async function getCurrentRound() {
   } catch (e) {
     logger.warn({ err: String(e && e.message) }, "falha ao sincronizar rodada; usando cache do banco");
   }
-  const round = synced && synced.round != null
-    ? await Round.findOne({ number: synced.round }).lean()
+  const syncedRoundNumber = synced && (synced.advancedTo ?? synced.round);
+  const round = syncedRoundNumber != null
+    ? await Round.findOne({ number: syncedRoundNumber }).lean()
     : await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
   return toRoundDTO(round);
 }
@@ -113,8 +114,9 @@ async function listMatches(roundId) {
     } catch (e) {
       logger.warn({ err: String(e && e.message) }, "falha ao sincronizar jogos; usando cache do banco");
     }
-    round = synced && synced.round != null
-      ? await Round.findOne({ number: synced.round }).lean()
+    const syncedRoundNumber = synced && (synced.advancedTo ?? synced.round);
+    round = syncedRoundNumber != null
+      ? await Round.findOne({ number: syncedRoundNumber }).lean()
       : await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
   }
   if (!round) return [];
