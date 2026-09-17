@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "rootDirectory": "docs",
   "headers": [
     {
       "source": "/(.*)\\.html$",
