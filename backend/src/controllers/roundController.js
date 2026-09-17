@@ -1,7 +1,7 @@
 const roundService = require("../services/roundService");
 
 async function current(req, res, next) {
-  try { return res.json({ round: await roundService.getCurrentRound(), meta: { source: "db" } }); }
+  try { return res.json({ round: await roundService.getCurrentRound(), meta: { source: "api-futebol" } }); }
   catch (e) { return next(e); }
 }
 async function list(req, res, next) {

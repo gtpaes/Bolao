@@ -1,4 +1,5 @@
 const Round = require("../models/Round");
+const { syncRound } = require("../integrations/football/sync");
 
 // Data da rodada = início do jogo mais cedo com data divulgada.
 // Jogos sem data (a definir) ficam de fora; se nenhum tiver data, retorna null.
@@ -54,10 +55,12 @@ function toMatchDTO(m) {
 // A prioridade natural vem do `sort({ number: -1 })`: open > closed > finished
 // só existem enquanto houver rodadas; a mais recente sempre vence.
 async function getCurrentRound() {
-  const round = await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
-  if (round) return toRoundDTO(round);
-  const latest = await Round.findOne({}).sort({ number: -1 }).lean();
-  return toRoundDTO(latest);
+  // A API-Futebol define a rodada atual. O sync mantem o mesmo registro no
+  // banco para que tickets e palpites continuem vinculados a essa rodada.
+  const synced = await syncRound();
+  if (!synced || synced.round == null) return null;
+  const round = await Round.findOne({ number: synced.round }).lean();
+  return toRoundDTO(round);
 }
 
 async function listRounds() {
@@ -76,10 +79,11 @@ async function listMatches(roundId) {
     round = await Round.findById(roundId).lean();
   }
   if (!round) {
-    // Inclui "finished": uma rodada recém-terminada (todos finalizados) ainda
-    // é a "atual" até o próximo sync abrir a seguinte. Excluir "finished" aqui
-    // faz o sistema cair na rodada 4 antiga e esconder os resultados.
-    round = await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
+    // Sem uma rodada explicita, sincroniza a rodada atual diretamente da API.
+    const synced = await syncRound();
+    if (synced && synced.round != null) {
+      round = await Round.findOne({ number: synced.round }).lean();
+    }
   }
   if (!round) return [];
   return (round.matches || []).map(toMatchDTO);
