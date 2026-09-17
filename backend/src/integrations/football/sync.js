@@ -65,20 +65,35 @@ function extractMatches(detail) {
 
 function pickTargetRound(list) {
   if (!Array.isArray(list) || !list.length) return null;
-  const st = (r) => String(r.status || "").toLowerCase();
-  const live = list.find((r) => st(r) === "andamento");
+  const normalizedStatus = (round) => String(round.status || "").toLowerCase().trim();
+  const numberOf = (round) => Number(round.rodada);
+  const ordered = list
+    .filter((round) => Number.isFinite(numberOf(round)))
+    .sort((a, b) => numberOf(a) - numberOf(b));
+  if (!ordered.length) return null;
+
+  // A API pode devolver as rodadas em qualquer ordem. Sempre priorize a rodada
+  // ao vivo mais recente, sem depender da posição na resposta.
+  const live = [...ordered].reverse().find((round) => ["andamento", "ao_vivo", "live"].includes(normalizedStatus(round)));
   if (live) return live;
-  // Rodada atual = a que vem DEPOIS da última rodada encerrada. A própria API
-  // informa essa rodada via "proxima_rodada" da última encerrada, o que evita
-  // cair em rodadas antigas "agendada" (jogos adiados/reagendados, ex. rodada 4).
-  const lastFinished = [...list].reverse().find((r) => st(r) === "encerrada");
+
+  const finishedStatuses = ["encerrada", "encerrado", "finalizada", "finalizado", "finished"];
+  const lastFinished = [...ordered].reverse().find((round) => finishedStatuses.includes(normalizedStatus(round)));
+
+  // Quando disponível, a referência oficial da API é mais confiável que a
+  // ordem da lista, especialmente quando existem rodadas adiadas.
   if (lastFinished && lastFinished.proxima_rodada && lastFinished.proxima_rodada.rodada != null) {
-    const next = list.find((r) => Number(r.rodada) === Number(lastFinished.proxima_rodada.rodada));
+    const next = ordered.find((round) => numberOf(round) === Number(lastFinished.proxima_rodada.rodada));
     if (next) return next;
   }
-  const scheduled = list.find((r) => st(r) === "agendada");
+
+  const lastFinishedNumber = lastFinished ? numberOf(lastFinished) : 0;
+  const scheduled = ordered.find((round) =>
+    ["agendada", "agendado", "scheduled"].includes(normalizedStatus(round)) && numberOf(round) > lastFinishedNumber,
+  );
   if (scheduled) return scheduled;
-  return list[list.length - 1];
+
+  return lastFinished || ordered[ordered.length - 1];
 }
 // Sincroniza a rodada atual (ou a informada) preservando o deadline do admin.
 async function syncRound(forceNumber) {
