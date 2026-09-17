@@ -11,6 +11,7 @@ async function apiGet(path) {
     err.code = "FOOTBALL_DISABLED";
     throw err;
   }
+  logger.debug({ path, keyConfigured: true }, "consultando API-Futebol");
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
   try {
@@ -23,7 +24,7 @@ async function apiGet(path) {
       logger.warn({ path, retryAfter }, "api-futebol rate limit");
     }
     if (!res.ok) {
-      const err = new Error(`API-Futebol respondeu ${res.status} em ${path}.`);
+      const err = new Error(`API-Futebol respondeu ${res.status} em ${path}. Verifique FOOTBALL_API_KEY e FOOTBALL_CAMPEONATO_ID no Render.`);
       err.status = 502;
       err.code = "FOOTBALL_ERROR";
       throw err;
