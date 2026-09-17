@@ -1,6 +1,7 @@
 const Round = require("../models/Round");
 const { syncRound } = require("../integrations/football/sync");
 const config = require("../config/env");
+const logger = require("../config/logger");
 
 let lastApiSyncAt = 0;
 let currentSyncPromise = null;
@@ -77,7 +78,12 @@ function toMatchDTO(m) {
 async function getCurrentRound() {
   // A API-Futebol define a rodada atual. O sync mantem o mesmo registro no
   // banco para que tickets e palpites continuem vinculados a essa rodada.
-  const synced = await syncCurrentRound();
+  let synced = null;
+  try {
+    synced = await syncCurrentRound();
+  } catch (e) {
+    logger.warn({ err: String(e && e.message) }, "falha ao sincronizar rodada; usando cache do banco");
+  }
   const round = synced && synced.round != null
     ? await Round.findOne({ number: synced.round }).lean()
     : await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
@@ -101,7 +107,12 @@ async function listMatches(roundId) {
   }
   if (!round) {
     // Sem uma rodada explicita, sincroniza a rodada atual diretamente da API.
-    const synced = await syncCurrentRound();
+    let synced = null;
+    try {
+      synced = await syncCurrentRound();
+    } catch (e) {
+      logger.warn({ err: String(e && e.message) }, "falha ao sincronizar jogos; usando cache do banco");
+    }
     round = synced && synced.round != null
       ? await Round.findOne({ number: synced.round }).lean()
       : await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();

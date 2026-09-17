@@ -43,8 +43,11 @@ async function apiGet(path) {
 // GET /campeonatos/{id}/rodadas -> [{ nome, slug, rodada, status, proxima_rodada, rodada_anterior, _link }]
 async function listRounds(campeonatoId = config.football.campeonatoId) {
   const data = await apiGet(`/campeonatos/${campeonatoId}/rodadas`);
-  if (!Array.isArray(data)) throw Object.assign(new Error("Formato inesperado da lista de rodadas."), { status: 502, code: "FOOTBALL_ERROR" });
-  return data;
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.rodadas)) return data.rodadas;
+  if (data && Array.isArray(data.rounds)) return data.rounds;
+  if (data && Number.isFinite(Number(data.rodada))) return [data];
+  throw Object.assign(new Error("Formato inesperado da lista de rodadas."), { status: 502, code: "FOOTBALL_ERROR" });
 }
 
 // GET /campeonatos/{id}/rodadas/{rodada} — formato exato mapeado em runtime (ver syncRound).
