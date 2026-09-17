@@ -1,5 +1,25 @@
 const Round = require("../models/Round");
 const { syncRound } = require("../integrations/football/sync");
+const config = require("../config/env");
+
+let lastApiSyncAt = 0;
+let currentSyncPromise = null;
+
+async function syncCurrentRound() {
+  const ttlMs = config.football.roundPollMinutes * 60 * 1000;
+  if (Date.now() - lastApiSyncAt < ttlMs) return null;
+  if (currentSyncPromise) return currentSyncPromise;
+
+  currentSyncPromise = syncRound()
+    .then((result) => {
+      lastApiSyncAt = Date.now();
+      return result;
+    })
+    .finally(() => {
+      currentSyncPromise = null;
+    });
+  return currentSyncPromise;
+}
 
 // Data da rodada = início do jogo mais cedo com data divulgada.
 // Jogos sem data (a definir) ficam de fora; se nenhum tiver data, retorna null.
@@ -57,9 +77,10 @@ function toMatchDTO(m) {
 async function getCurrentRound() {
   // A API-Futebol define a rodada atual. O sync mantem o mesmo registro no
   // banco para que tickets e palpites continuem vinculados a essa rodada.
-  const synced = await syncRound();
-  if (!synced || synced.round == null) return null;
-  const round = await Round.findOne({ number: synced.round }).lean();
+  const synced = await syncCurrentRound();
+  const round = synced && synced.round != null
+    ? await Round.findOne({ number: synced.round }).lean()
+    : await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
   return toRoundDTO(round);
 }
 
@@ -80,10 +101,10 @@ async function listMatches(roundId) {
   }
   if (!round) {
     // Sem uma rodada explicita, sincroniza a rodada atual diretamente da API.
-    const synced = await syncRound();
-    if (synced && synced.round != null) {
-      round = await Round.findOne({ number: synced.round }).lean();
-    }
+    const synced = await syncCurrentRound();
+    round = synced && synced.round != null
+      ? await Round.findOne({ number: synced.round }).lean()
+      : await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
   }
   if (!round) return [];
   return (round.matches || []).map(toMatchDTO);

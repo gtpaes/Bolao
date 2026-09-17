@@ -33,7 +33,10 @@ const config = {
     apiKey: process.env.FOOTBALL_API_KEY || "",
     campeonatoId: num("FOOTBALL_CAMPEONATO_ID", 10),
     roundPollMinutes: Math.max(5, num("FOOTBALL_ROUND_POLL_MINUTES", 30)),
-    livePollSeconds: Math.max(30, num("FOOTBALL_LIVE_POLL_SECONDS", 30)),
+    // A cota da API-Futebol e limitada; nunca consultar ao vivo a cada 30s.
+    // 10 minutos e o padrao, com piso de 5 minutos mesmo se o ambiente antigo
+    // ainda estiver configurado com 30 segundos.
+    livePollSeconds: Math.max(300, num("FOOTBALL_LIVE_POLL_SECONDS", 600)),
     matchDurationMinutes: num("FOOTBALL_MATCH_DURATION_MINUTES", 130),
     timeoutMs: num("FOOTBALL_TIMEOUT_MS", 10000),
     enabled: Boolean(process.env.FOOTBALL_API_KEY),

@@ -37,8 +37,7 @@ function startJobs() {
   });
 
   // Ao vivo: polling inteligente que só consulta a API quando há algo relevante.
-  // Evita esgotar a cota diária (100 req/dia) fazendo listLive() a cada 30s
-  // indiscriminadamente.
+  // O intervalo efetivo e de 10 minutos por padrao para preservar a cota diaria.
   let liveTimer = null;
 
   async function shouldPollLive(round) {
@@ -47,7 +46,7 @@ function startJobs() {
     const now = new Date();
     const nowMs = now.getTime();
 
-    // Se houver algum jogo com status "live", deve consultar frequentemente.
+    // Se houver algum jogo com status "live", consulta no proximo ciclo longo.
     if (round.matches.some((m) => m && m.status === "live")) return true;
 
     // Se houver algum jogo agendado a começar em breve (< 15 min), também deve
@@ -72,7 +71,7 @@ function startJobs() {
   async function getNextPollDelay(round) {
     // Se tem algo para monitorar agora, mantém intervalo curto.
     if (await shouldPollLive(round)) {
-      // A cada 30s (mínimo permitido)
+      // Nunca consultar mais frequentemente que o piso configurado (5 min).
       return config.football.livePollSeconds * 1000;
     }
 
@@ -105,7 +104,7 @@ function startJobs() {
     // Sem jogos futuros conhecidos: retorna ao intervalo normal mas com um
     // limite para não ficar muito tempo sem verificar (ex: novo jogo pode ser
     // adicionado pelo syncRound).
-    return 5 * 60 * 1000; // 5 minutos
+    return 15 * 60 * 1000; // 15 minutos sem jogos relevantes
   }
 
   async function livePollLoop() {
@@ -137,7 +136,7 @@ function startJobs() {
       const round = await livePollLoop();
       if (!round) {
         // Nenhuma rodada aberta ou sem jogos relevantes
-        liveTimer = setTimeout(tick, 5 * 60 * 1000);
+        liveTimer = setTimeout(tick, 15 * 60 * 1000);
         return;
       }
 
@@ -152,17 +151,17 @@ function startJobs() {
       liveTimer = setTimeout(tick, delayMs);
     } catch (e) {
       logger.warn({ err: String(e && e.message) }, "falha no polling de ao vivo");
-      // Em caso de erro, tenta novamente após 1 minuto
+      // Em caso de erro, aguarda para não gastar a cota em tentativas seguidas.
       if (liveTimer) {
         clearInterval(liveTimer);
       }
-      liveTimer = setTimeout(tick, 60 * 1000);
+      liveTimer = setTimeout(tick, 15 * 60 * 1000);
     }
   };
 
   // Inicia o timer de polling ao vivo
-  liveTimer = setTimeout(tick, config.football.livePollSeconds * 1000);
-  logger.info("jobs agendados");
+  liveTimer = setTimeout(tick, 15 * 60 * 1000);
+  logger.info({ livePollSeconds: config.football.livePollSeconds }, "jobs agendados");
 }
 
 module.exports = { startJobs };
