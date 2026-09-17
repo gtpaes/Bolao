@@ -1,8 +1,9 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json ./
+COPY backend/package.json ./package.json
 RUN npm install --omit=dev
-COPY src ./src
+COPY backend/src ./src
+COPY docs ./docs
 ENV NODE_ENV=production
 EXPOSE 3001
 CMD ["node", "src/server.js"]

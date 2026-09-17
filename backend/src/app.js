@@ -9,7 +9,12 @@ const apiRoutes = require("./routes/api");
 const swaggerSpec = require("./docs/swagger");
 
 const path = require("path");
-const FRONTEND_DIR = ["frontend", "docs"].map((d) => path.join(__dirname, "..", "..", d)).find((p) => require("fs").existsSync(p)) || path.join(__dirname, "..", "..", "docs");
+const FRONTEND_DIR = [
+  path.join(__dirname, "..", "frontend"),
+  path.join(__dirname, "..", "docs"),
+  path.join(__dirname, "..", "..", "frontend"),
+  path.join(__dirname, "..", "..", "docs"),
+].find((p) => require("fs").existsSync(p)) || path.join(__dirname, "..", "docs");
 
 // CORS configuration for bolao backend
 const corsOptions = require("./config/cors");
