@@ -8,14 +8,6 @@ const { errorHandler } = require("./middlewares/errorHandler");
 const apiRoutes = require("./routes/api");
 const swaggerSpec = require("./docs/swagger");
 
-const path = require("path");
-const FRONTEND_DIR = [
-  path.join(__dirname, "..", "frontend"),
-  path.join(__dirname, "..", "docs"),
-  path.join(__dirname, "..", "..", "frontend"),
-  path.join(__dirname, "..", "..", "docs"),
-].find((p) => require("fs").existsSync(p)) || path.join(__dirname, "..", "docs");
-
 // CORS configuration for bolao backend
 const corsOptions = require("./config/cors");
 
@@ -28,9 +20,6 @@ function createApp() {
   app.use(express.json({ limit: "512kb" }));
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeaders: true, legacyHeaders: false }));
 
-  // Frontend estático (deploy dev em localhost, mesma origem da API).
-  app.use(express.static(FRONTEND_DIR, { index: false }));
-  app.get("/", (req, res) => res.sendFile(path.join(FRONTEND_DIR, "login.html")));
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
   app.use("/api", apiRoutes);
   app.use((req, res) => res.status(404).json({
