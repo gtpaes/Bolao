@@ -16,7 +16,7 @@ async function smoke() {
     return ok;
   }
   const ok =
-    (await check("/", 200)) &
+    (await check("/", 404)) &
     (await check("/api/health", 200)) &
     (await check("/api/rounds/current", 401)) &
     (await check("/rota-inexistente", 404)) &

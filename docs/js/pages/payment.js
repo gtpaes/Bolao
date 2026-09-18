@@ -1,7 +1,7 @@
 /* js/pages/payment.js — Pagamento Pix */
 import { loadTemplate, run } from "./loader.js";
 import { get } from "../../utils/storage.js";
-import { createPayment } from "../api/payments.js";
+import { createPayment, paymentStatus } from "../api/payments.js";
 import { brl } from "../../utils/format.js";
 import { esc } from "../../utils/dom.js";
 import { stateNode } from "../../utils/states.js";
@@ -17,9 +17,7 @@ export async function render(view) {
     const chip = view.querySelector('[data-host="status-chip"]');
     chip.textContent = "Preparado";
 
-    // UI inicial: gerando
     host.replaceChildren(stateNode("loading", { title: "Gerando pagamento...", message: "Aguarde enquanto a cobrança Pix é criada." }));
-    view.querySelector(".state").innerHTML = `<span class="spinner"></span><h3>Gerando pagamento...</h3><p>Aguarde enquanto a cobrança Pix é criada.</p>`;
 
     const summary = document.createElement("div");
     summary.className = "card";
@@ -33,19 +31,16 @@ export async function render(view) {
     host.replaceChildren(summary);
 
     const resultHost = summary.querySelector("#pay-result");
-    resultHost.appendChild(stateNode("off", {
-      title: "Pagamento via Pix",
-      message: "O QR Code e o código copia-e-cola aparecerão aqui.",
-    }));
-
-    // Tenta criar a cobrança
     let payment = null;
     try {
       payment = await createPayment({ quantity: order.qty });
+      renderPixPaymentState(resultHost, payment, order, view, chip);
+      startPaymentPolling(view, payment.id, chip, resultHost);
     } catch (e) {
       resultHost.replaceChildren(paymentErrorState(order, e));
       renderStepper(view, "error");
       chip.textContent = "Falha na cobrança";
+      toastError("Erro no pagamento", e.message || "Não foi possível gerar a cobrança.");
       return;
     }
   });
@@ -65,6 +60,93 @@ function renderStepper(view, state) {
   if (window.lucide) window.lucide.createIcons({ nodes: [box] });
 }
 
+function renderPixPaymentState(resultHost, payment, order, view, chip) {
+  renderStepper(view, "waiting");
+  chip.textContent = "Aguardando Pix";
+
+  const qrMarkup = payment.qrcode
+    ? `<img alt="QR Code do Pix" src="data:image/png;base64,${payment.qrcode}" style="max-width:220px;width:100%;display:block;margin:0 auto 12px;border-radius:12px;background:#fff;padding:8px;" />`
+    : "";
+
+  const codeText = payment.qrcode_text || "Código Pix indisponível no momento.";
+  const total = Number(payment.amount ?? order.total ?? 0);
+
+  resultHost.innerHTML = `
+    <div class="pix-status">
+      <div class="pix-qr">${qrMarkup}</div>
+      <h3>Pagamento via Pix</h3>
+      <p class="t-muted">Valor: <strong>${brl(total)}</strong></p>
+      <p class="t-muted">Expira em: <strong>${Math.max(1, Number(payment.expires_in || 1800))}s</strong></p>
+      <div class="code-box" style="margin-top:12px;word-break:break-all;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px;">${esc(codeText)}</div>
+      <button class="btn btn-primary" data-copy-pix="true" style="margin-top:12px;">Copiar código Pix</button>
+    </div>
+  `;
+
+  const btn = resultHost.querySelector('[data-copy-pix="true"]');
+  if (btn) {
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(codeText);
+        toastInfo("Código Pix copiado", "Você pode colar no app do seu banco.");
+      } catch (e) {
+        toastError("Não foi possível copiar", "Selecione o código manualmente.");
+      }
+    });
+  }
+}
+
+async function startPaymentPolling(view, paymentId, chip, resultHost) {
+  let attempts = 0;
+  const maxAttempts = 36;
+
+  const tick = async () => {
+    attempts += 1;
+    try {
+      const status = await paymentStatus(paymentId);
+      const current = String(status && status.status ? status.status : "pending");
+
+      if (current === "approved") {
+        renderStepper(view, "approved");
+        chip.textContent = "Pagamento aprovado";
+        resultHost.innerHTML = `
+          <div class="pix-status">
+            <span class="ps-big-ico" style="background:var(--success-bg);color:var(--success)"><i data-lucide="check-circle"></i></span>
+            <h3>Pagamento confirmado</h3>
+            <p class="t-muted">Seu(s) ticket(s) foi(ram) liberado(s) para aposta.</p>
+          </div>`;
+        if (window.lucide) window.lucide.createIcons({ nodes: resultHost });
+        return;
+      }
+
+      if (current === "expired" || current === "refused") {
+        renderStepper(view, "error");
+        chip.textContent = current === "expired" ? "Pix expirado" : "Pagamento recusado";
+        resultHost.innerHTML = `
+          <div class="pix-status">
+            <span class="ps-big-ico" style="background:var(--danger-bg);color:var(--danger)"><i data-lucide="alert-circle"></i></span>
+            <h3>${current === "expired" ? "Cobrança expirada" : "Pagamento recusado"}</h3>
+            <p class="t-muted">Tente gerar uma nova cobrança e repetir a compra.</p>
+          </div>`;
+        if (window.lucide) window.lucide.createIcons({ nodes: resultHost });
+        return;
+      }
+
+      if (attempts < maxAttempts) {
+        setTimeout(tick, 5000);
+      } else {
+        renderStepper(view, "waiting");
+        chip.textContent = "Aguardando confirmação";
+      }
+    } catch (e) {
+      if (attempts < maxAttempts) {
+        setTimeout(tick, 5000);
+      }
+    }
+  };
+
+  setTimeout(tick, 2000);
+}
+
 function paymentErrorState(order, err) {
   const w = document.createElement("div");
   w.innerHTML = `
@@ -78,5 +160,6 @@ function paymentErrorState(order, err) {
     toastInfo("Nova tentativa", "Gerando a cobrança novamente.");
     window.location.reload();
   });
+  if (window.lucide) window.lucide.createIcons({ nodes: w });
   return w;
 }

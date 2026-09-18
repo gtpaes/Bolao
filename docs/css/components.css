@@ -110,7 +110,7 @@
 .card-pad-sm { padding: var(--space-4); }
 .card-flush { padding: 0; overflow: hidden; }
 .card-header {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
   gap: var(--space-3); padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border);
 }
@@ -267,7 +267,7 @@
 
 /* ---------- Modal ---------- */
 .modal-overlay {
-  position: fixed; inset: 0; z-index: 60;
+  position: fixed; inset: 0; z-index: 66;
   background: var(--overlay);
   display: flex; align-items: flex-end; justify-content: center;
   animation: fadeIn .16s ease-out;
@@ -283,7 +283,6 @@
 .modal-title { font-size: 1.15rem; }
 .modal-close { color: var(--muted); }
 .modal-close:hover { color: var(--ink); background: var(--surface-2); border-radius: var(--radius-sm); }
-.modal-body { }
 .modal-footer { display: flex; gap: var(--space-3); justify-content: flex-end; margin-top: var(--space-5); }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -361,5 +360,46 @@
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
+/* Coluna principal + coluna lateral (proporção definida por --split) */
+.grid-split { grid-template-columns: var(--split, 2fr 1fr); }
 @media (max-width: 900px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } .grid-3 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 900px) { .grid-split { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+/* ============================================================
+   Responsivo — adaptações de toque e telas pequenas.
+   O desktop permanece exatamente como estava.
+   ============================================================ */
+
+/* Alvos de toque confortáveis no tablet/celular (sem mudar a aparência) */
+@media (max-width: 900px) {
+  .icon-btn { width: 44px; height: 44px; }
+  .input-ico { width: 40px; height: 40px; right: 4px; }
+  .input-wrap .input { padding-right: 50px; }
+  .tab { display: inline-flex; align-items: center; min-height: 40px; }
+  .btn-sm { min-height: 38px; }
+  .btn-link { display: inline-flex; align-items: center; min-height: 32px; }
+  .modal-close { width: 44px; height: 44px; }
+  .state { padding: var(--space-6) var(--space-4); }
+}
+
+/* Telas pequenas: nenhum componente pode estourar a largura da viewport */
+@media (max-width: 560px) {
+  .btn { white-space: normal; }
+  .card-header { padding: var(--space-4); }
+  .card-body, .card-footer { padding: var(--space-4); }
+  .table th, .table td { padding: 10px 12px; }
+  .tabs { -webkit-overflow-scrolling: touch; }
+  .modal { max-height: 94dvh; padding-bottom: max(var(--space-5), env(safe-area-inset-bottom)); }
+  .modal-footer { flex-wrap: wrap; }
+  .modal-footer .btn { flex: 1 1 140px; }
+  /* Contagem regressiva: as células se ajustam à largura do card */
+  .countdown { flex-wrap: wrap; }
+  .cd-cell { min-width: 0; flex: 1 1 56px; padding: 8px 6px; }
+  .cd-num { font-size: 1.3rem; }
+  /* Palpites: times na primeira linha e os placares logo abaixo */
+  .pick-group { flex-wrap: wrap; justify-content: center; row-gap: var(--space-3); }
+  .pick-team { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+  .pick-scores { order: 3; flex: 0 0 100%; }
+  .scoring-item { flex-wrap: wrap; row-gap: var(--space-2); }
+}

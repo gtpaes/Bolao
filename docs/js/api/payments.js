@@ -9,8 +9,8 @@ export async function createPayment({ quantity }) {
 }
 
 export async function getPayment(id) {
-  if (!API.mock) return request(`/payments/${id}`);
-  return operationPending("GET /api/payments/:id");
+  if (!API.mock) return request(`/payments/${id}/status`);
+  return operationPending("GET /api/payments/:id/status");
 }
 
 /** Consulta o status de uma cobrança. */
