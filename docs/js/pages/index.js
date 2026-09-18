@@ -2,6 +2,7 @@
 import * as dashboard from "./dashboard.js";
 import * as round from "./round.js";
 import * as picks from "./picks.js";
+import * as bets from "./bets.js";
 import * as tickets from "./tickets.js";
 import * as buy from "./buy.js";
 import * as payment from "./payment.js";
@@ -16,6 +17,7 @@ export const pages = {
   dashboard: dashboard,
   round: round,
   picks: picks,
+  bets: bets,
   tickets: tickets,
   buy: buy,
   payment: payment,

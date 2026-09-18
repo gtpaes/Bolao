@@ -9,6 +9,7 @@ const ROUTES = [
   { path: "dashboard", title: "Dashboard", role: ["user", "admin", "dev"] },
   { path: "round", title: "Rodada", role: ["user", "admin", "dev"] },
   { path: "picks", title: "Fazer Palpites", role: ["user", "admin", "dev"] },
+  { path: "bets", title: "Apostas da Rodada", role: ["user", "admin", "dev"] },
   { path: "tickets", title: "Meus Tickets", role: ["user", "admin", "dev"] },
   { path: "buy", title: "Comprar Tickets", role: ["user", "admin", "dev"] },
   { path: "payment", title: "Pagamento", role: ["user", "admin", "dev"] },

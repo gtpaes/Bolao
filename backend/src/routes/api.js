@@ -34,6 +34,7 @@ router.get("/admin/rounds/:id/matches", authJwt, requireRole("admin", "dev"), ro
 
 // Tickets
 router.get("/tickets", authJwt, ticketController.list);
+router.get("/picks/public", authJwt, ticketController.publicPicks);
 router.get("/tickets/:id", authJwt, ticketController.get);
 router.post("/tickets", authJwt, ticketController.buy);
 router.put("/tickets/:id/picks", authJwt, ticketController.picks);

@@ -69,6 +69,10 @@
 /* Ticket card */
 .ticket-card .tc-actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); flex-wrap: wrap; }
 .th-pts { font-size: 1.5rem; font-weight: 800; font-family: var(--font-mono); color: var(--green-500); }
+.public-pick-list { display: grid; gap: 8px; }
+.public-pick-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 9px 0; border-bottom: 1px solid var(--border); color: var(--muted); font-size: .88rem; }
+.public-pick-row:last-child { border-bottom: none; }
+.public-pick-row strong { color: var(--ink); font-family: var(--font-mono); }
 
 /* Wallet */
 .wallet-balance { text-align: center; padding: var(--space-6); border-radius: var(--radius-md); background: linear-gradient(160deg, var(--green-50), var(--surface)); border: 1px solid var(--border); }

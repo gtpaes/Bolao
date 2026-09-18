@@ -1,6 +1,7 @@
 const Ticket = require("../models/Ticket");
 const Round = require("../models/Round");
 const Payment = require("../models/Payment");
+const Pick = require("../models/Pick");
 const { badRequest, forbidden, notFound, paymentRequired } = require("../utils/errors");
 const { newIdempotencyKey } = require("../utils/idempotency");
 
@@ -120,7 +121,74 @@ async function savePicks(userId, ticketId, picks) {
   }
   ticket.picks = normalized;
   await ticket.save();
+  await Pick.deleteMany({ ticketId: ticket._id });
+  if (normalized.length) {
+    await Pick.insertMany(normalized.map((pick) => ({
+      ticketId: ticket._id,
+      userId: ticket.userId,
+      roundId: ticket.roundId,
+      matchExternalId: pick.matchExternalId,
+      home: pick.home,
+      away: pick.away,
+      points: 0,
+    })), { ordered: true });
+  }
   return toTicketDTO(ticket.toObject(), round.toObject());
 }
 
-module.exports = { listMyTickets, getMyTicket, buyTickets, savePicks, isRoundClosedForPicks, UNIT_PRICE_CENTS };
+async function listPublicPicks(roundId) {
+  const round = roundId
+    ? await Round.findById(roundId).lean()
+    : await Round.findOne({}).sort({ number: -1 }).lean();
+  if (!round) return { round: null, tickets: [] };
+
+  const tickets = await Ticket.find({
+    roundId: round._id,
+    status: { $in: ["released", "closed", "scored"] },
+    "picks.0": { $exists: true },
+  }).populate("userId", "username").sort({ number: 1 }).lean();
+  const persisted = await Pick.find({ roundId: round._id }).sort({ ticketId: 1, matchExternalId: 1 }).lean();
+  const matchesById = new Map((round.matches || []).map((match) => [Number(match.externalId), match]));
+  const byTicket = new Map();
+
+  for (const ticket of tickets) {
+    byTicket.set(String(ticket._id), {
+      ticket_id: String(ticket._id),
+      ticket_number: ticket.number,
+      username: ticket.userId && ticket.userId.username ? ticket.userId.username : "Usuário",
+      points: Number(ticket.points) || 0,
+      picks: [],
+    });
+  }
+  for (const pick of persisted) {
+    const entry = byTicket.get(String(pick.ticketId));
+    if (entry) {
+      const match = matchesById.get(Number(pick.matchExternalId));
+      entry.picks.push({
+        match_id: pick.matchExternalId,
+        home_team: match ? match.home : "Mandante",
+        away_team: match ? match.away : "Visitante",
+        home: pick.home,
+        away: pick.away,
+        points: pick.points || 0,
+      });
+    }
+  }
+  for (const ticket of tickets) {
+    const entry = byTicket.get(String(ticket._id));
+    if (entry && !entry.picks.length) entry.picks = (ticket.picks || []).map((pick) => ({
+      match_id: pick.matchExternalId,
+      home_team: matchesById.get(Number(pick.matchExternalId))?.home || "Mandante",
+      away_team: matchesById.get(Number(pick.matchExternalId))?.away || "Visitante",
+      home: pick.home,
+      away: pick.away,
+      points: pick.points || 0,
+    }));
+  }
+  return {
+    round: { id: String(round._id), number: round.number, name: round.name || "" },
+    tickets: [...byTicket.values()],
+  };
+}
+
+module.exports = { listMyTickets, getMyTicket, buyTickets, savePicks, listPublicPicks, isRoundClosedForPicks, UNIT_PRICE_CENTS };

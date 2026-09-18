@@ -4,6 +4,7 @@ const MAIN = [
   { route: "dashboard", label: "Dashboard", icon: "layout-dashboard" },
   { route: "round", label: "Rodada", icon: "calendar-clock" },
   { route: "picks", label: "Palpites", icon: "target" },
+  { route: "bets", label: "Apostas da Rodada", icon: "users-round" },
   { route: "tickets", label: "Meus Tickets", icon: "ticket" },
   { route: "ranking", label: "Ranking", icon: "list-ordered" },
   { route: "live", label: "Ao Vivo", icon: "radio" },
@@ -30,7 +31,7 @@ const DEV = [
   { route: "dev/diagnostics", label: "Diagnóstico", icon: "stethoscope" },
 ];
 
-const MOBILE_PRIMARY = ["dashboard", "round", "picks", "tickets", "ranking"];
+const MOBILE_PRIMARY = ["dashboard", "round", "picks", "bets", "ranking"];
 
 export function roleLinks(role) {
   const links = [...MAIN];
