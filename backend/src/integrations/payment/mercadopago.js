@@ -3,7 +3,7 @@ const logger = require("../../config/logger");
 
 // Cria cobrança Pix via Mercado Pago (Checkout Pro / Payment API).
 // Retorna { gatewayPaymentId, qrText, qrBase64, expiresAt, expiresInSeconds }.
-async function createPixCharge({ paymentId, amountCents, description, idempotencyKey }) {
+async function createPixCharge({ paymentId, amountCents, description, idempotencyKey, payerEmail }) {
   if (!config.mp.accessToken) {
     const err = new Error("Pagamentos ainda não estão configurados no servidor.");
     err.status = 503;
@@ -13,11 +13,12 @@ async function createPixCharge({ paymentId, amountCents, description, idempotenc
   const { MercadoPagoConfig, Payment: MpPayment } = require("mercadopago");
   const client = new MercadoPagoConfig({ accessToken: config.mp.accessToken });
   const payment = new MpPayment(client);
+  const email = String(payerEmail || "comprador@bolao.local").trim().toLowerCase();
   const body = {
     transaction_amount: Number((amountCents / 100).toFixed(2)),
     description: String(description || "Bolão — tickets").slice(0, 120),
     payment_method_id: "pix",
-    payer: { email: "comprador@bolao.local" },
+    payer: { email },
     external_reference: String(paymentId),
     notification_url: undefined,
   };

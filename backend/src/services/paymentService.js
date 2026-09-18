@@ -42,7 +42,15 @@ async function createPayment(userId, quantity) {
     });
     await Ticket.updateMany({ _id: { $in: created.map((t) => t._id) } }, { $set: { paymentId: payment._id } });
 
-    const charge = await createPixCharge({ paymentId: String(payment._id), amountCents: totalCents, description: `Bolão — ${qty} ticket(s)`, idempotencyKey: payment.idempotencyKey });
+    const user = await require("../models/User").findById(userId).lean();
+    const payerEmail = user && user.email ? user.email : "comprador@bolao.local";
+    const charge = await createPixCharge({
+      paymentId: String(payment._id),
+      amountCents: totalCents,
+      description: `Bolão — ${qty} ticket(s)`,
+      idempotencyKey: payment.idempotencyKey,
+      payerEmail,
+    });
     await Payment.updateOne(
       { _id: payment._id },
       { $set: { gatewayPaymentId: charge.gatewayPaymentId, qrText: charge.qrText || null, qrBase64: charge.qrBase64 || null, expiresAt: charge.expiresAt || payment.expiresAt } }
