@@ -51,7 +51,7 @@ export async function adminRound(view) {
             <div class="field"><label for="r-number">Número de rodada</label><input class="input" id="r-number" type="number" min="1" value="${current ? esc(current.number) : ""}" placeholder="Ex. 3" /></div>
             <div class="field"><label for="r-status">Status</label><select class="select" id="r-status"><option value="open">Aberto</option><option value="closed">Fechado</option></select></div>
             <div class="field"><label for="r-open">Abertura</label><input class="input" id="r-open" type="datetime-local" /></div>
-            <div class="field"><label for="r-close">Fechamento</label><input class="input" id="r-close" type="datetime-local" /></div>
+            <div class="field"><label for="r-close-at">Fechamento</label><input class="input" id="r-close-at" type="datetime-local" /></div>
           </div>
           <div style="display:flex;gap:var(--space-3);flex-wrap:wrap">
             <button class="btn btn-primary" id="r-save"><i data-lucide="save"></i> Salvar</button>
