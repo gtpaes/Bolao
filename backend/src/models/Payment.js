@@ -12,11 +12,11 @@ const paymentSchema = new Schema(
       index: true,
     },
     gateway: { type: String, default: "mercadopago" },
-    gatewayPaymentId: { type: String, default: null, unique: true, sparse: true },
+    gatewayPaymentId: { type: String, default: undefined, index: { unique: true, sparse: true } },
     qrText: { type: String, default: null },
     qrBase64: { type: String, default: null },
     idempotencyKey: { type: String, required: true, unique: true },
-    webhookEventId: { type: String, default: null, unique: true, sparse: true },
+    webhookEventId: { type: String, default: undefined, index: { unique: true, sparse: true } },
     expiresAt: { type: Date, default: null, index: true },
   },
   { timestamps: { createdAt: true, updatedAt: true } }
