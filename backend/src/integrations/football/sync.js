@@ -100,6 +100,14 @@ async function resolveRoundNumber(forceNumber) {
   if (forceNumber != null && Number.isFinite(Number(forceNumber)) && Number(forceNumber) > 0) {
     return Number(forceNumber);
   }
+  if (config.football.provider === "football-data") {
+    try {
+      const target = pickTargetRound(await listRounds());
+      if (target) return Number(target.rodada);
+    } catch (e) {
+      logger.warn({ err: String(e && e.message) }, "falha ao descobrir rodada atual");
+    }
+  }
   const latest = await Round.findOne({ status: { $in: ["open", "closed", "finished"] } })
     .sort({ number: -1 })
     .select({ number: 1 })

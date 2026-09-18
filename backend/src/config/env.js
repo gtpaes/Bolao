@@ -13,6 +13,11 @@ function secret(name) {
     .trim();
 }
 
+const footballProvider = process.env.FOOTBALL_PROVIDER || "football-data";
+const footballBaseUrl = process.env.FOOTBALL_API_BASE_URL || (
+  footballProvider === "football-data" ? "https://api.football-data.org/v4" : "https://api.api-futebol.com.br/v1"
+);
+
 const config = {
   port: num("PORT", 3001),
   nodeEnv: process.env.NODE_ENV || "development",
@@ -37,8 +42,10 @@ const config = {
   jwtSecret: secret("JWT_SECRET") || "dev-secret-troque-em-producao",
   jwtExpiration: process.env.JWT_EXPIRATION || "8h",
   football: {
-    baseUrl: (process.env.FOOTBALL_API_BASE_URL || "https://api.api-futebol.com.br/v1").replace(/\/$/, ""),
+    provider: footballProvider,
+    baseUrl: footballBaseUrl.replace(/\/$/, ""),
     apiKey: secret("FOOTBALL_API_KEY"),
+    competitionCode: process.env.FOOTBALL_COMPETITION_CODE || "BSA",
     campeonatoId: num("FOOTBALL_CAMPEONATO_ID", 10),
     roundNumber: num("FOOTBALL_ROUND_NUMBER", 28),
     roundPollMinutes: Math.max(5, num("FOOTBALL_ROUND_POLL_MINUTES", 30)),
