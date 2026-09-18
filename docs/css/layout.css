@@ -35,7 +35,7 @@
 .auth-heading { font-size: 1.6rem; margin-bottom: var(--space-1); }
 .auth-sub { color: var(--muted); margin-bottom: var(--space-6); }
 .auth-alt { text-align: center; margin-top: var(--space-5); font-size: 0.92rem; color: var(--muted); }
-.auth-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-4); }
+.auth-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); row-gap: var(--space-2); margin-bottom: var(--space-4); }
 .divider-text { display: flex; align-items: center; gap: var(--space-3); color: var(--muted-2); font-size: 0.8rem; margin: var(--space-5) 0; }
 .divider-text::before, .divider-text::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
@@ -70,7 +70,7 @@
   height: var(--header-h); padding-inline: var(--space-5);
   background: var(--header-bg); border-bottom: 1px solid var(--border);
 }
-.app-header .h-title { font-size: 1.05rem; font-weight: 700; }
+.app-header .h-title { font-size: 1.05rem; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .header-right { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
 .header-menu-btn { display: none; }
 
@@ -122,15 +122,19 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 .bottom-nav ul { display: flex; }
-.bottom-nav li { flex: 1; }
+.bottom-nav li { flex: 1; min-width: 0; }
 .bottom-nav a {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  padding: 8px 2px 9px; color: var(--muted); font-size: 0.64rem; font-weight: 600;
+  min-width: 0; padding: 8px 2px 9px; color: var(--muted); font-size: 0.64rem; font-weight: 600;
   transition: color .14s;
+}
+/* Os rótulos não podem alargar a barra em telas estreitas (320px). */
+.bottom-nav a span, .bottom-nav .bn-more-btn span {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .bottom-nav a:hover { text-decoration: none; color: var(--ink); }
 .bottom-nav a.active { color: var(--green-500); }
-.bottom-nav .bn-more-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px 9px; color: var(--muted); font-size: 0.64rem; font-weight: 600; }
+.bottom-nav .bn-more-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 8px 2px 9px; color: var(--muted); font-size: 0.64rem; font-weight: 600; }
 
 /* Main content */
 .app-main { padding: var(--space-5); padding-bottom: calc(var(--bottomnav-h-mobile) + var(--space-6)); }
@@ -154,6 +158,19 @@
   .app-main { padding: var(--space-4); padding-bottom: calc(var(--bottomnav-h-mobile) + var(--space-5)); }
   .bottom-nav { display: block; }
   .sb-nav-hidden { display: none; }
+  /* Drawer: alvo de toque maior nos itens e respiro para a barra do sistema */
+  .sidebar-drawer .sb-link { padding: 12px; }
+  .sidebar-drawer .sb-footer { padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom)); }
+  /* Atalho para o perfil com área de toque confortável (o avatar não muda) */
+  .header-chip { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--radius-sm); }
+}
+
+/* Celular na horizontal / telas baixas: compacta o shell para sobrar altura útil */
+@media (max-width: 900px) and (max-height: 520px) {
+  .app-header { height: 56px; padding-inline: var(--space-3); }
+  .bottom-nav a, .bottom-nav .bn-more-btn { padding: 4px 2px 5px; }
+  .app-main { padding: var(--space-3); padding-bottom: calc(52px + var(--space-3)); }
+  .modal { max-height: 96dvh; }
 }
 
 /* Sidebar móvel (drawer) quando aberto */
@@ -164,6 +181,8 @@
 .sidebar-drawer .drawer {
   position: relative; height: 100%; width: var(--sidebar-w); max-width: 86vw;
   background: var(--sidebar-bg); display: flex; flex-direction: column;
-  box-shadow: var(--shadow-lg); animation: drawerIn .22s ease-out; overflow-y: auto;
+  box-shadow: var(--shadow-lg); animation: drawerIn .22s ease-out;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 @keyframes drawerIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }

@@ -22,7 +22,7 @@ export async function render(view) {
     hero.innerHTML = `
       <div class="hero" style="padding:var(--space-6)">
         <div style="display:flex;gap:var(--space-4);align-items:center;flex-wrap:wrap">
-          <div style="flex:1;min-width:240px">
+          <div style="flex:1 1 200px;min-width:0">
             <span class="badge badge-green">Futebol</span>
             <h1 style="margin-top:var(--space-3)">Olá, ${heroName}</h1>
             <p>${hasRound ? ('Rodada ' + round.number + ' — faça seus palpites antes do fechamento.') : 'Nenhuma rodada aberta no momento. Compre seus tickets e prepare-se para a próxima rodada.'}</p>

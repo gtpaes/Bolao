@@ -105,6 +105,7 @@ export async function adminMatches(view) {
         label.className = "field";
         label.style.display = "flex";
         label.style.alignItems = "center";
+        label.style.flexWrap = "wrap";
         label.style.gap = "var(--space-3)";
         label.innerHTML = `<input type="checkbox" value="${esc(match.externalId)}" ${match.enabled_for_tickets ? "checked" : ""} /><span>${esc(match.home)} x ${esc(match.away)}</span><span class="t-muted t-small">${esc(match.status || "")}</span>`;
         list.appendChild(label);

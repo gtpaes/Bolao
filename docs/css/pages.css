@@ -84,9 +84,9 @@
 .lv-success { color: var(--success); }
 
 /* Status de integração (dev) */
-.svc-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) 0; border-bottom: 1px solid var(--border); }
+.svc-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-4) 0; border-bottom: 1px solid var(--border); }
 .svc-row:last-child { border-bottom: none; }
-.svc-name { display: flex; align-items: center; gap: var(--space-3); font-weight: 700; }
+.svc-name { display: flex; align-items: center; gap: var(--space-3); font-weight: 700; min-width: 0; }
 .svc-dot { width: 10px; height: 10px; border-radius: 50%; }
 .svc-dot.online { background: var(--success); }
 .svc-dot.offline { background: var(--danger); }

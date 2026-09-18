@@ -28,14 +28,23 @@ export function initTheme() {
 }
 
 function updateToggleButtons(theme) {
-  const icon = theme === "dark" ? "sun" : "moon";
+  // O símbolo reflete o tema atual: lua no escuro, sol no claro.
+  const iconName = theme === "dark" ? "moon" : "sun";
   document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
     btn.setAttribute("aria-label", theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro");
     btn.title = theme === "dark" ? "Modo claro" : "Modo escuro";
-    const i = btn.querySelector("i[data-lucide]");
-    if (i) i.setAttribute("data-lucide", icon);
+    // Após o Lucide renderizar, o <i> vira <svg> mantendo o atributo data-lucide.
+    const holder = btn.querySelector("i[data-lucide], svg[data-lucide]");
+    if (!holder) return;
+    // Evita acumular classes do ícone anterior (ex.: lucide-moon) a cada troca.
+    Array.from(holder.classList).forEach((c) => {
+      if (c.indexOf("lucide-") === 0) holder.classList.remove(c);
+    });
+    holder.setAttribute("data-lucide", iconName);
+    if (typeof window.lucide === "undefined" || !window.lucide.createIcons) return;
+    try {
+      // `root` limita a atualização ao botão (versões sem suporte simplesmente usam o documento).
+      window.lucide.createIcons({ root: btn, attrs: { "aria-hidden": "true" } });
+    } catch (e) { /* noop */ }
   });
-  if (typeof window.lucide !== "undefined") {
-    try { window.lucide.createIcons(); } catch (e) { /* noop */ }
-  }
 }

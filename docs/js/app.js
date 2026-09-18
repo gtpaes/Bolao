@@ -45,8 +45,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const bnMore = byId("bn-more");
   if (bnMore) bnMore.addEventListener("click", () => openMoreSheet(role));
 
-  // Logout
-  document.querySelectorAll("[data-logout]").forEach((b) => b.addEventListener("click", onLogout));
+  // Logout — delegação: vale para o shell e para botões renderizados depois (ex.: Meu Perfil)
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-logout]");
+    if (!btn) return;
+    onLogout(e);
+  });
 
   // Iniciar router
   initRouter();
@@ -81,6 +85,11 @@ function openDrawer() {
         <div><div class="logo-text">Bolão</div><div class="logo-sub">Futebol</div></div>
       </div>
       <nav class="sb-nav" data-drawer-nav></nav>
+      <div class="sb-footer">
+        <button class="btn btn-ghost btn-block btn-sm" data-logout>
+          <i data-lucide="log-out"></i> Sair
+        </button>
+      </div>
     </aside>`;
   document.body.appendChild(drawer);
   const nav = drawer.querySelector("[data-drawer-nav]");
