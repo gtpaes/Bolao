@@ -1,6 +1,7 @@
 const Ticket = require("../models/Ticket");
 const Round = require("../models/Round");
 const Payment = require("../models/Payment");
+const logger = require("../config/logger");
 const { createPixCharge, fetchGatewayPayment } = require("../integrations/payment/mercadopago");
 const { newIdempotencyKey } = require("../utils/idempotency");
 const { badRequest, forbidden, notFound } = require("../utils/errors");
@@ -17,39 +18,49 @@ async function openRoundOrThrow() {
 async function createPayment(userId, quantity) {
   const qty = Math.floor(Number(quantity));
   if (!Number.isFinite(qty) || qty < 1 || qty > 100) throw badRequest("Quantidade inválida.");
-  const round = await openRoundOrThrow();
-  const totalCents = qty * UNIT_PRICE_CENTS;
 
-  const last = await Ticket.find({ userId, roundId: round._id }).sort({ number: -1 }).limit(1).lean();
-  const startNumber = last.length ? last[0].number + 1 : 1;
-  const docs = [];
-  for (let i = 0; i < qty; i += 1) {
-    docs.push({ userId, roundId: round._id, number: startNumber + i, unitPriceCents: UNIT_PRICE_CENTS, status: "waiting_payment", picks: [], points: 0 });
+  try {
+    const round = await openRoundOrThrow();
+    const totalCents = qty * UNIT_PRICE_CENTS;
+
+    logger.info({ userId, quantity: qty, roundId: String(round._id), totalCents }, "iniciando criacao de pagamento");
+
+    const last = await Ticket.find({ userId, roundId: round._id }).sort({ number: -1 }).limit(1).lean();
+    const startNumber = last.length ? last[0].number + 1 : 1;
+    const docs = [];
+    for (let i = 0; i < qty; i += 1) {
+      docs.push({ userId, roundId: round._id, number: startNumber + i, unitPriceCents: UNIT_PRICE_CENTS, status: "waiting_payment", picks: [], points: 0 });
+    }
+    const created = await Ticket.insertMany(docs, { ordered: true });
+    const payment = await Payment.create({
+      userId,
+      ticketIds: created.map((t) => t._id),
+      amountCents: totalCents,
+      status: "pending",
+      idempotencyKey: newIdempotencyKey("pay"),
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    });
+    await Ticket.updateMany({ _id: { $in: created.map((t) => t._id) } }, { $set: { paymentId: payment._id } });
+
+    const charge = await createPixCharge({ paymentId: String(payment._id), amountCents: totalCents, description: `Bolão — ${qty} ticket(s)`, idempotencyKey: payment.idempotencyKey });
+    await Payment.updateOne(
+      { _id: payment._id },
+      { $set: { gatewayPaymentId: charge.gatewayPaymentId, qrText: charge.qrText || null, qrBase64: charge.qrBase64 || null, expiresAt: charge.expiresAt || payment.expiresAt } }
+    );
+
+    logger.info({ paymentId: String(payment._id), gatewayPaymentId: charge.gatewayPaymentId }, "pagamento Pix criado com sucesso");
+
+    return {
+      id: String(payment._id),
+      qrcode: charge.qrBase64 || null,
+      qrcode_text: charge.qrText || null,
+      expires_in: charge.expiresInSeconds || 1800,
+      amount: totalCents / 100,
+    };
+  } catch (e) {
+    logger.error({ err: { message: e && e.message, stack: e && e.stack }, userId, quantity }, "falha ao criar pagamento");
+    throw e;
   }
-  const created = await Ticket.insertMany(docs, { ordered: true });
-  const payment = await Payment.create({
-    userId,
-    ticketIds: created.map((t) => t._id),
-    amountCents: totalCents,
-    status: "pending",
-    idempotencyKey: newIdempotencyKey("pay"),
-    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-  });
-  await Ticket.updateMany({ _id: { $in: created.map((t) => t._id) } }, { $set: { paymentId: payment._id } });
-
-  const charge = await createPixCharge({ paymentId: String(payment._id), amountCents: totalCents, description: `Bolão — ${qty} ticket(s)`, idempotencyKey: payment.idempotencyKey });
-  await Payment.updateOne(
-    { _id: payment._id },
-    { $set: { gatewayPaymentId: charge.gatewayPaymentId, qrText: charge.qrText || null, qrBase64: charge.qrBase64 || null, expiresAt: charge.expiresAt || payment.expiresAt } }
-  );
-
-  return {
-    id: String(payment._id),
-    qrcode: charge.qrBase64 || null,
-    qrcode_text: charge.qrText || null,
-    expires_in: charge.expiresInSeconds || 1800,
-    amount: totalCents / 100,
-  };
 }
 
 async function getPaymentStatus(userId, paymentId) {

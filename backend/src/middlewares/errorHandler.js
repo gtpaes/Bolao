@@ -22,7 +22,12 @@ function errorHandler(err, req, res, next) {
       path: req.originalUrl,
     });
   }
-  logger.error({ err: String((err && err.message) || err), path: req.originalUrl }, "unhandled error");
+  logger.error({
+    err: { message: err && err.message, stack: err && err.stack },
+    path: req.originalUrl,
+    method: req.method,
+    body: req.body,
+  }, "unhandled error");
   return res.status(500).json({
     timestamp: new Date().toISOString(),
     status: 500,
