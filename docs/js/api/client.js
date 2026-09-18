@@ -87,5 +87,5 @@ export function operationPending(resource) {
   return Promise.reject(new Error(`Não foi possível concluir: ${resource}. Tente novamente.`));
 }
 
-/** Pequeno atraso opcional apenas para UX (evita flash em abas). Não é dado falso. */
-export const delay = (ms = 260) => new Promise((r) => setTimeout(r, ms));
+/** Sem atrasos artificiais: a UI deve responder imediatamente ao backend. */
+export const delay = () => Promise.resolve();

@@ -1,16 +1,14 @@
 /* js/api/tickets.js — Tickets (GET/POST /api/tickets). */
-import { request, API, delay, operationPending } from "./client.js";
+import { request, API, operationPending } from "./client.js";
 
 export async function listTickets() {
   if (!API.mock) return request("/tickets");
-  await delay(300);
   // Nenhum ticket ainda. UI mostra estado vazio.
   return { tickets: [] };
 }
 
 export async function getTicket(id) {
   if (!API.mock) return request(`/tickets/${id}`);
-  await delay(200);
   return { ticket: null };
 }
 

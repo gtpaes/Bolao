@@ -11,16 +11,23 @@ import { toastSuccess, toastError } from "../../components/toast.js";
 export async function render(view) {
   await loadTemplate(view, "picks.html");
   await run(view, async () => {
+    const statusChip = view.querySelector('[data-host="status-chip"]');
+    const pickerHost = view.querySelector('[data-host="ticket-picker"]');
+    const formHost = view.querySelector('[data-host="picks-form"]');
+
+    if (!statusChip || !pickerHost || !formHost) {
+      throw new Error("A estrutura da página de palpites não carregou corretamente.");
+    }
+
     let round = null;
     try { round = (await getCurrentRound()).round; } catch (e) { /* noop */ }
     let tickets = [];
     try { tickets = (await listTickets()).tickets || []; } catch (e) { tickets = []; }
 
     const closed = round && round.deadline && new Date(round.deadline).getTime() <= Date.now();
-    view.querySelector('[data-host="status-chip"]').innerHTML =
+    statusChip.innerHTML =
       closed ? '<span class="badge badge-gray">Encerrados</span>' : '<span class="badge badge-green">Abertos</span>';
 
-    const pickerHost = view.querySelector('[data-host="ticket-picker"]');
     if (!tickets.length) {
       pickerHost.replaceChildren(stateNode("empty", { title: "Você precisa de um ticket", message: "Compre ao menos um ticket para fazer seus palpites." }));
       pickerHost.insertAdjacentHTML("afterend", `<div class="state" style="padding:var(--space-5)"><a class="btn btn-primary btn-lg" href="#/buy">Comprar tickets</a></div>`);
@@ -38,7 +45,6 @@ export async function render(view) {
       </div>`;
     pickerHost.replaceChildren(picker);
 
-    const formHost = view.querySelector('[data-host="picks-form"]');
     let matches = null;
     try { matches = (await listMatches(round && round.id)).matches || []; } catch (e) { matches = null; }
     if (matches === null) { formHost.replaceChildren(stateNode("error", { title: "Não foi possível carregar os jogos", message: "Ocorreu um erro ao buscar os jogos. Tente novamente." })); return; }
