@@ -1,5 +1,7 @@
 const Round = require("../models/Round");
 const { syncRound } = require("../integrations/football/sync");
+const { getScoringRules } = require("./settingsService");
+const { POINTS } = require("../utils/scoring");
 const config = require("../config/env");
 const logger = require("../config/logger");
 
@@ -35,7 +37,9 @@ function roundStartDate(matches) {
   return best === null ? null : new Date(best);
 }
 
-function toRoundDTO(r) {
+// `rules` são as regras globais (Settings) — a mesma pontuação vale para
+// todas as rodadas; o campo da rodada só serve de fallback/legado.
+function toRoundDTO(r, rules) {
   if (!r) return null;
   const o = typeof r.toObject === "function" ? r.toObject() : r;
   return {
@@ -47,7 +51,7 @@ function toRoundDTO(r) {
     providerStatus: o.providerStatus,
     date: roundStartDate(o.matches),
     deadline: o.deadline,
-    scoringRules: o.scoringRules || { exact: 10, draw: 6, winner: 4, miss: 0 },
+    scoringRules: rules || o.scoringRules || POINTS,
     syncedAt: o.syncedAt,
   };
 }
@@ -90,17 +94,18 @@ async function getCurrentRound() {
   const round = syncedRoundNumber != null
     ? await Round.findOne({ number: syncedRoundNumber }).lean()
     : await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
-  return toRoundDTO(round);
+  return toRoundDTO(round, await getScoringRules());
 }
 
 async function listRounds() {
   const rounds = await Round.find({}).sort({ number: -1 }).lean();
-  return rounds.map(toRoundDTO);
+  const rules = await getScoringRules();
+  return rounds.map((round) => toRoundDTO(round, rules));
 }
 
 async function getRound(id) {
   const round = await Round.findById(id).lean();
-  return toRoundDTO(round);
+  return toRoundDTO(round, await getScoringRules());
 }
 
 async function listMatches(roundId) {

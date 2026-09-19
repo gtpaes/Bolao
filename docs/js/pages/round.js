@@ -7,6 +7,9 @@ import { countdown } from "../../components/countdown.js";
 import { dateShort, time } from "../../utils/format.js";
 import { matchCardSmall } from "./dashboard.js";
 
+// Fallback quando o backend ainda não respondeu (mesmos padrões do servidor).
+const DEFAULT_RULES = { exact: 10, draw: 6, winner: 4, miss: 0 };
+
 export async function render(view) {
   await loadTemplate(view, "round.html");
   await run(view, async () => {
@@ -14,12 +17,18 @@ export async function render(view) {
     if (subHost) subHost.textContent = "Informação da rodada atual, prazo e jogos.";
 
     let round = null;
-    try { round = (await getCurrentRound()).round; } catch (e) { /* noop */ }
+    let rules = null;
+    try {
+      const payload = (await getCurrentRound()) || {};
+      round = payload.round || null;
+      // Regras globais do bolão — as mesmas para todas as rodadas.
+      rules = payload.rules || (round && round.scoringRules) || null;
+    } catch (e) { /* noop */ }
+    rules = { ...DEFAULT_RULES, ...(rules || {}) };
 
     const sumHost = view.querySelector('[data-host="round-summary"]');
     if (round) {
       const closed = isClosed(round);
-      const rules = round && round.scoringRules ? round.scoringRules : { exact: 10, draw: 6, winner: 4 };
       const badge = closed ? '<span class="badge badge-gray">Palpites encerrados</span>' : '<span class="badge badge-green">Palpites abertos</span>';
       const card = document.createElement("div");
       card.innerHTML = `
@@ -68,12 +77,12 @@ export async function render(view) {
       <div class="card" id="scoring" style="margin-top:var(--space-5)">
         <div class="card-header"><h2 class="card-title"><i data-lucide="target"></i> Regras de pontuação</h2></div>
         <div class="card-body">
-          <p class="t-muted t-small" style="margin-bottom:var(--space-4)">Confira abaixo quanto vale cada acerto.</p>
+          <p class="t-muted t-small" style="margin-bottom:var(--space-4)">Confira abaixo quanto vale cada acerto. As regras são as mesmas para todas as rodadas.</p>
           <div class="scoring-grid">
             <div class="scoring-item"><span class="si-label">Placar exato</span><span class="si-pts">${esc(String(rules.exact))} pontos</span></div>
             <div class="scoring-item"><span class="si-label">Empate correto</span><span class="si-pts">${esc(String(rules.draw))} pontos</span></div>
             <div class="scoring-item"><span class="si-label">Vencedor correto (sem acertar o placar)</span><span class="si-pts">${esc(String(rules.winner))} pontos</span></div>
-            <div class="scoring-item"><span class="si-label">Erro</span><span class="si-pts">0 pontos</span></div>
+            <div class="scoring-item"><span class="si-label">Erro</span><span class="si-pts">${esc(String(rules.miss))} pontos</span></div>
           </div>
         </div>
       </div>`;

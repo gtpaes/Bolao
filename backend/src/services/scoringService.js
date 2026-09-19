@@ -3,6 +3,7 @@ const Round = require("../models/Round");
 const ScoreLog = require("../models/ScoreLog");
 const Pick = require("../models/Pick");
 const { scorePick, POINTS } = require("../utils/scoring");
+const { getScoringRules } = require("./settingsService");
 const logger = require("../config/logger");
 
 // Processa a pontuação de UMA rodada (idempotente por ScoreLog único).
@@ -11,6 +12,8 @@ async function processRoundScoring(roundId) {
   if (!round) return { processed: 0 };
   const finished = (round.matches || []).filter((m) => m.status === "finished" && m.homeScore != null && m.awayScore != null);
   if (!finished.length) return { processed: 0 };
+  // Regras globais (Configurações) — a mesma pontuação vale para todas as rodadas.
+  const rules = await getScoringRules();
   const tickets = await Ticket.find({ roundId: round._id, status: { $in: ["released", "closed", "scored"] } });
   let processed = 0;
   for (const ticket of tickets) {
@@ -26,7 +29,7 @@ async function processRoundScoring(roundId) {
         );
         continue;
       }
-      const points = scorePick(Number(pick.home), Number(pick.away), Number(match.homeScore), Number(match.awayScore), round.scoringRules || POINTS);
+      const points = scorePick(Number(pick.home), Number(pick.away), Number(match.homeScore), Number(match.awayScore), rules);
       pick.points = points;
       await ScoreLog.create({
         roundId: round._id,
@@ -50,7 +53,7 @@ async function processRoundScoring(roundId) {
     }
   }
   logger.info({ round: round.number, processed }, "pontuação processada");
-  return { processed, rules: round.scoringRules || POINTS };
+  return { processed, rules };
 }
 
 async function getRanking(roundId) {

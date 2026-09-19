@@ -260,7 +260,7 @@ export async function adminSettings(view) {
     view.querySelector("#cfg-save").addEventListener("click", async () => {
       try {
         await request("/admin/settings", { method: "PATCH", body: { priceCents: Math.round(Number(view.querySelector("#cfg-price").value) * 100), autoClose: view.querySelector("#cfg-auto-close").checked, points: { exact: Number(view.querySelector("#cfg-exact").value), draw: Number(view.querySelector("#cfg-draw").value), winner: Number(view.querySelector("#cfg-winner").value), miss: Number(view.querySelector("#cfg-miss").value) } } });
-        toastSuccess("Configuração salva", "As regras foram aplicadas às rodadas abertas.");
+        toastSuccess("Regras salvas", "Valem para todas as rodadas — nada de salvar rodada por rodada.");
       } catch (e) { toastError("Não foi possível salvar", e.message); }
     });
   });

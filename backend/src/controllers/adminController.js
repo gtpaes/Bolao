@@ -2,7 +2,7 @@ const Round = require("../models/Round");
 const Ticket = require("../models/Ticket");
 const User = require("../models/User");
 const Payment = require("../models/Payment");
-const Settings = require("../models/Settings");
+const settingsService = require("../services/settingsService");
 const { syncRound } = require("../integrations/football/sync");
 const { processRoundScoring } = require("../services/scoringService");
 const { badRequest, notFound } = require("../utils/errors");
@@ -141,18 +141,15 @@ async function setUserRole(req, res, next) {
 }
 
 async function getSettings(req, res, next) {
-  try { const settings = await Settings.findOneAndUpdate({ key: "default" }, { $setOnInsert: { key: "default" } }, { upsert: true, new: true }).lean(); return res.json({ settings }); }
+  try { return res.json({ settings: await settingsService.getSettings() }); }
   catch (e) { return next(e); }
 }
 
+// Salva as regras globais. Elas valem para todas as rodadas automaticamente,
+// então não existe (nem é preciso) salvar regra por rodada.
 async function updateSettings(req, res, next) {
-  try {
-    const body = req.body || {};
-    const points = body.points || {};
-    const settings = await Settings.findOneAndUpdate({ key: "default" }, { $set: { priceCents: Math.max(1, Math.floor(Number(body.priceCents || 1000))), autoClose: body.autoClose !== false, points: { exact: Math.max(0, Number(points.exact ?? 10)), draw: Math.max(0, Number(points.draw ?? 6)), winner: Math.max(0, Number(points.winner ?? 4)), miss: Math.max(0, Number(points.miss ?? 0)) } } }, { upsert: true, new: true });
-    await Round.updateMany({ status: "open" }, { $set: { scoringRules: settings.points } });
-    return res.json({ ok: true, settings });
-  } catch (e) { return next(e); }
+  try { return res.json({ ok: true, settings: await settingsService.updateSettings(req.body || {}) }); }
+  catch (e) { return next(e); }
 }
 
 module.exports = { overview, setDeadline, closeRound, reopenRound, syncNow, setRoundMatches, addMatch, listUsers, listTickets, setUserRole, getSettings, updateSettings };

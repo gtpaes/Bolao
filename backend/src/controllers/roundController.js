@@ -1,7 +1,12 @@
 const roundService = require("../services/roundService");
+const settingsService = require("../services/settingsService");
 
 async function current(req, res, next) {
-  try { return res.json({ round: await roundService.getCurrentRound(), meta: { source: "api-futebol" } }); }
+  try {
+    const [round, rules] = await Promise.all([roundService.getCurrentRound(), settingsService.getScoringRules()]);
+    // `rules` é enviado separado para a página mostrar as regras mesmo sem rodada aberta.
+    return res.json({ round, rules, meta: { source: "api-futebol" } });
+  }
   catch (e) { return next(e); }
 }
 async function list(req, res, next) {
