@@ -1,6 +1,6 @@
 /* js/pages/picks.js — Fazer Palpites (usuário) */
 import { loadTemplate, run } from "./loader.js";
-import { getCurrentRound } from "../api/rounds.js";
+import { getCurrentRound, isRoundClosed } from "../api/rounds.js";
 import { listMatches } from "../api/matches.js";
 import { listTickets, getTicket, savePicks } from "../api/tickets.js";
 import { stateNode } from "../../utils/states.js";
@@ -24,7 +24,9 @@ export async function render(view) {
     let tickets = [];
     try { tickets = (await listTickets()).tickets || []; } catch (e) { tickets = []; }
 
-    const closed = round && round.deadline && new Date(round.deadline).getTime() <= Date.now();
+    // A trava vem resolvida do servidor (can_pick), incluindo a regra "1º jogo − 2h";
+    // antes a tela mostrava "Abertos" com a rodada já encerrada.
+    const closed = isRoundClosed(round);
     statusChip.innerHTML =
       closed ? '<span class="badge badge-gray">Encerrados</span>' : '<span class="badge badge-green">Abertos</span>';
 

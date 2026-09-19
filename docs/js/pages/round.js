@@ -1,6 +1,6 @@
 /* js/pages/round.js — Rodada (usuário) */
 import { loadTemplate, run } from "./loader.js";
-import { getCurrentRound } from "../api/rounds.js";
+import { getCurrentRound, isRoundClosed, roundClosesAt } from "../api/rounds.js";
 import { listMatches } from "../api/matches.js";
 import { stateNode } from "../../utils/states.js";
 import { countdown } from "../../components/countdown.js";
@@ -28,7 +28,7 @@ export async function render(view) {
 
     const sumHost = view.querySelector('[data-host="round-summary"]');
     if (round) {
-      const closed = isClosed(round);
+      const closed = isRoundClosed(round);
       const badge = closed ? '<span class="badge badge-gray">Palpites encerrados</span>' : '<span class="badge badge-green">Palpites abertos</span>';
       const card = document.createElement("div");
       card.innerHTML = `
@@ -46,7 +46,7 @@ export async function render(view) {
             if (sumHost) sumHost.replaceChildren(card);
       if (!closed) {
         const cdHost = card.querySelector("#round-countdown");
-        const cd = countdown(round.deadline, "Encerrado");
+        const cd = countdown(roundClosesAt(round), "Encerrado");
         cdHost.appendChild(cd.node);
       }
     } else {
@@ -89,10 +89,6 @@ export async function render(view) {
   });
 }
 
-function isClosed(round) {
-  if (!round || !round.deadline) return false;
-  return new Date(round.deadline).getTime() <= Date.now();
-}
 function esc(v) {
   return String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }

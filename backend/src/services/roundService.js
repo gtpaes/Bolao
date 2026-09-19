@@ -1,6 +1,7 @@
 const Round = require("../models/Round");
 const { syncRound } = require("../integrations/football/sync");
 const { getScoringRules } = require("./settingsService");
+const { closesAt, isRoundOpenForPicks } = require("./roundLifecycle");
 const { POINTS } = require("../utils/scoring");
 const config = require("../config/env");
 const logger = require("../config/logger");
@@ -51,6 +52,14 @@ function toRoundDTO(r, rules) {
     providerStatus: o.providerStatus,
     date: roundStartDate(o.matches),
     deadline: o.deadline,
+    // Instante real de fechamento (deadline definido pelo admin ou 1º jogo − 2h) e
+    // a trava já resolvida no servidor — o frontend não recalcula a regra.
+    closes_at: (() => {
+      const ms = closesAt(o);
+      return ms == null ? null : new Date(ms);
+    })(),
+    can_pick: isRoundOpenForPicks(o),
+    manual_override: Boolean(o.manualOverride),
     scoringRules: rules || o.scoringRules || POINTS,
     syncedAt: o.syncedAt,
   };

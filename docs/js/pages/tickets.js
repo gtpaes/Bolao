@@ -9,6 +9,8 @@ const STATUS_BADGE = {
   waiting_payment: ["badge-amber", "Aguardando pagamento"],
   paid: ["badge-blue", "Pago"],
   released: ["badge-green", "Liberado"],
+  closed: ["badge-amber", "Palpites encerrados"],
+  scored: ["badge-blue", "Pontuado"],
   active: ["badge-green", "Em andamento"],
   finished: ["badge-gray", "Finalizado"],
 };

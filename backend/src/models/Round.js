@@ -34,6 +34,10 @@ const roundSchema = new Schema(
     slug: { type: String, default: "" },
     providerStatus: { type: String, default: "agendada" },
     status: { type: String, enum: ["open", "closed", "finished"], default: "open", index: true },
+    // true = o admin assumiu o controle manual do status. A regra automática
+    // (fechar 2h antes do 1º jogo) é ignorada nesta rodada até o admin devolver
+    // o controle para "Automático".
+    manualOverride: { type: Boolean, default: false },
     deadline: { type: Date, default: null, index: true },
     // Janela estendida para jogos adiados movidos para esta rodada
     extendedDeadline: { type: Date, default: null },

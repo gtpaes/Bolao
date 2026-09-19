@@ -5,14 +5,24 @@ const Round = require("../models/Round");
 const Payment = require("../models/Payment");
 const logger = require("../config/logger");
 const { createPixCharge, fetchGatewayPayment } = require("../integrations/payment/mercadopago");
+const { autoCloseIfDue, isRoundOpenForPicks } = require("./roundLifecycle");
 const { newIdempotencyKey } = require("../utils/idempotency");
 const { badRequest, forbidden, notFound } = require("../utils/errors");
 
 const UNIT_PRICE_CENTS = 1000;
 
-async function openRoundOrThrow() {
+// A venda fecha no MESMO instante dos palpites (1º jogo − 2h): o helper decide pelo
+// relógio, sem depender de o timer já ter gravado status "closed". Quando vence,
+// aproveitamos para alinhar o estado (fecha a rodada e marca os tickets) — mas só
+// se o admin não tiver desligado o fechamento automático em Configurações.
+// A recusa vale sempre; o que o "autoClose=false" desliga é o fechamento sozinho.
+async function openRoundOrThrow({ autoClose = true } = {}) {
   const round = await Round.findOne({ status: "open" }).sort({ number: -1 });
   if (!round) throw badRequest("Nenhuma rodada aberta no momento.");
+  if (!isRoundOpenForPicks(round)) {
+    if (autoClose) await autoCloseIfDue(round).catch(() => {});
+    throw forbidden("A venda de tickets desta rodada foi encerrada.", "ROUND_CLOSED");
+  }
   return round;
 }
 
@@ -22,8 +32,10 @@ async function createPayment(userId, quantity) {
   if (!Number.isFinite(qty) || qty < 1 || qty > 100) throw badRequest("Quantidade inválida.");
 
   try {
-    const round = await openRoundOrThrow();
+    // Configurações primeiro: o autoClose decide se uma venda tardia também fecha a
+    // rodada, ou se o fechamento fica a cargo do admin.
     const settings = await Settings.findOne({ key: "default" }).lean();
+    const round = await openRoundOrThrow({ autoClose: !settings || settings.autoClose !== false });
     const unitPriceCents = settings && Number(settings.priceCents) > 0 ? Number(settings.priceCents) : UNIT_PRICE_CENTS;
     const totalCents = qty * unitPriceCents;
 
@@ -113,13 +125,18 @@ async function releasePaymentTickets(paymentId, status) {
         { $setOnInsert: { nextNumber: 0 }, $inc: { nextNumber: payment.quantity } },
         { upsert: true, new: true, session }
       );
+      // Pagamento aprovado DEPOIS do fechamento (ex.: Pix pago no apagar das luzes)
+      // não pode liberar um ticket que já nasce bloqueado — ele entra como "closed".
+      // Antes disso, a rodada ficava fechada com tickets marcados como liberados.
+      const round = await Round.findById(payment.roundId).session(session).lean();
+      const ticketStatus = isRoundOpenForPicks(round) ? "released" : "closed";
       const startNumber = counter.nextNumber - payment.quantity + 1;
       const docs = Array.from({ length: payment.quantity }, (_, index) => ({
         userId: payment.userId,
         roundId: payment.roundId,
         number: startNumber + index,
         unitPriceCents: Math.floor(payment.amountCents / payment.quantity),
-        status: "released",
+        status: ticketStatus,
         picks: [],
         points: 0,
         paymentId: payment._id,

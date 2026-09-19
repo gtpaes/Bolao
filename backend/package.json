@@ -9,7 +9,8 @@
     "start": "NODE_ENV=production node src/server.js",
     "test": "node --test tests/scoring.test.js tests/sync.test.js tests/roundClosed.test.js",
     "seed": "node scripts/seed.js",
-    "smoke": "node smoke.js"
+    "smoke": "node smoke.js",
+    "repair:rounds": "node scripts/repairRoundClose.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

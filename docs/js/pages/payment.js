@@ -148,12 +148,15 @@ async function startPaymentPolling(view, paymentId, chip, resultHost) {
 }
 
 function paymentErrorState(order, err) {
+  // Mensagem do servidor quando existe: "a rodada fechou" não se resolve
+  // tentando de novo, e o usuário precisa entender o motivo.
+  const detail = (err && err.message) ? err.message : "Não foi possível gerar a cobrança. Tente novamente.";
   const w = document.createElement("div");
   w.innerHTML = `
     <div class="pix-status">
       <span class="ps-big-ico" style="background:var(--danger-bg);color:var(--danger)"><i data-lucide="alert-circle"></i></span>
       <h3>Erro ao processar pagamento</h3>
-      <p class="t-muted">Não foi possível gerar a cobrança. Tente novamente.</p>
+      <p class="t-muted">${esc(detail)}</p>
       <button class="btn btn-primary" id="retry-pay"><i data-lucide="refresh-cw"></i> Tentar novamente</button>
     </div>`;
   w.querySelector("#retry-pay").addEventListener("click", () => {

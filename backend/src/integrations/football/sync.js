@@ -147,13 +147,21 @@ async function syncRound(forceNumber) {
   const mergedItems = [...items, ...manualMatches.filter((manual) => !items.some((item) => Number(item.externalId) === Number(manual.externalId)))];
   const prevDeadline = existing ? existing.deadline : null;
   const prevStatus = existing ? existing.status : null;
+  const prevManual = Boolean(existing && existing.manualOverride);
   const finishedCount = items.filter((m) => m.status === "finished").length;
   const providerStatus = String(target.status || "").toLowerCase();
   const autoStatus = finishedCount && finishedCount === items.length ? "finished" : providerStatus === "encerrada" ? "finished" : "open";
 
+  // "finished" é DADO (todos os jogos encerraram na API), não política: sempre vence,
+  // senão a rodada nunca avançaria. Já o abre/fecha é política — e quando o admin
+  // assumiu o controle manual (manualOverride), o sync não desfaz a decisão dele.
+  const nextStatus = autoStatus === "finished"
+    ? "finished"
+    : (prevManual ? prevStatus : (prevStatus === "closed" ? "closed" : autoStatus));
+
   const doc = await Round.findOneAndUpdate(
     { number: Number(target.rodada) },
-    { $set: { name: target.nome || `${target.rodada}ª Rodada`, slug: target.slug || "", providerStatus: target.status || "", status: prevStatus === "closed" ? "closed" : autoStatus, deadline: prevDeadline, matches: mergedItems, source: "api-futebol", syncedAt: new Date() } },
+    { $set: { name: target.nome || `${target.rodada}ª Rodada`, slug: target.slug || "", providerStatus: target.status || "", status: nextStatus, deadline: prevDeadline, matches: mergedItems, source: "api-futebol", syncedAt: new Date() } },
     { upsert: true, new: true }
   );
 
@@ -180,9 +188,12 @@ async function syncRound(forceNumber) {
           : true;
       }
       if (nextItems.length) {
+        // Rodada nova abre; se o admin já tinha assumido o controle dela, mantém
+        // o status dele em vez de forçar "open".
+        const nextRoundStatus = nextExisting && nextExisting.manualOverride ? nextExisting.status : "open";
         await Round.findOneAndUpdate(
           { number: Number(target.proxima_rodada.rodada) },
-          { $set: { name: target.proxima_rodada.nome || `${target.proxima_rodada.rodada}ª Rodada`, slug: target.proxima_rodada.slug || "", providerStatus: target.proxima_rodada.status || "agendada", status: "open", matches: nextItems, source: "api-futebol", syncedAt: new Date() }, $setOnInsert: { deadline: null } },
+          { $set: { name: target.proxima_rodada.nome || `${target.proxima_rodada.rodada}ª Rodada`, slug: target.proxima_rodada.slug || "", providerStatus: target.proxima_rodada.status || "agendada", status: nextRoundStatus, matches: nextItems, source: "api-futebol", syncedAt: new Date() }, $setOnInsert: { deadline: null } },
           { upsert: true, new: true }
         );
         advancedTo = Number(target.proxima_rodada.rodada);
@@ -199,7 +210,9 @@ async function applyLive(liveItems) {
   const mine = (liveItems || []).filter((it) => Number(it && it.campeonato && it.campeonato.campeonato_id) === Number(config.football.campeonatoId));
   if (!mine.length) return { updated: 0 };
   const byId = new Map(mine.map((it) => [Number(it.partida_id), it]));
-  const rounds = await Round.find({ status: "open", "matches.status": { $in: ["scheduled", "live"] } }).sort({ number: -1 }).limit(3);
+  // Inclui "closed": os placares ao vivo continuam sendo aplicados depois do
+  // fechamento dos palpites (a rodada fecha 2h antes do 1º jogo).
+  const rounds = await Round.find({ status: { $in: ["open", "closed"] }, "matches.status": { $in: ["scheduled", "live"] } }).sort({ number: -1 }).limit(3);
   let updated = 0;
   for (const r of rounds) {
     let changed = false;

@@ -1,15 +1,17 @@
 const Ticket = require("../models/Ticket");
 const Round = require("../models/Round");
 const Pick = require("../models/Pick");
+const { isRoundOpenForPicks } = require("./roundLifecycle");
 const { badRequest, forbidden, notFound, paymentRequired } = require("../utils/errors");
 
 const UNIT_PRICE_CENTS = 1000;
 
+// Fonte única de verdade: services/roundLifecycle.js. Aqui só invertemos o sinal
+// para manter a leitura "trava de palpites" já usada nesta camada. Assim o
+// bloqueio vale no segundo exato do fechamento, mesmo antes de o status
+// "closed" ser persistido pelo timer/cron.
 function isRoundClosedForPicks(round) {
-  if (!round) return true;
-  if (round.status !== "open") return true;
-  if (round.deadline && new Date(round.deadline).getTime() <= Date.now()) return true;
-  return false;
+  return !isRoundOpenForPicks(round);
 }
 
 function toTicketDTO(t, round) {
@@ -23,6 +25,9 @@ function toTicketDTO(t, round) {
     points: o.points || 0,
     acquired_at: o.createdAt,
     payment_id: o.paymentId ? String(o.paymentId) : null,
+    // A UI usa isto para não oferecer "Salvar palpites" numa rodada vencida.
+    round_status: round ? round.status : null,
+    can_pick: Boolean(o.status === "released" && isRoundOpenForPicks(round)),
   };
 }
 
@@ -100,7 +105,9 @@ async function listPublicPicks(roundId, ticketId) {
     ? await Round.findById(roundId).lean()
     : await Round.findOne({}).sort({ number: -1 }).lean();
   if (!round) return { round: null, tickets: [], visible: false };
-  if (round.status === "open") {
+  // Enquanto a rodada aceita palpites, os palpites alheios ficam ocultos —
+  // inclusive quando ela já venceu no relógio mas o status ainda não foi gravado.
+  if (isRoundOpenForPicks(round)) {
     return { round: { id: String(round._id), number: round.number, name: round.name || "" }, tickets: [], visible: false };
   }
 

@@ -4,8 +4,57 @@ const logger = require("../config/logger");
 const { syncRound, applyLive } = require("../integrations/football/sync");
 const { listLive } = require("../integrations/football/client");
 const { processRoundScoring } = require("../services/scoringService");
+const { autoCloseIfDue, closesAt } = require("./roundLifecycle");
 const Round = require("../models/Round");
 const Settings = require("../models/Settings");
+
+// setTimeout não deve dormir semanas; acima disso o timer acorda e re-avalia.
+const MAX_TIMER_MS = 6 * 60 * 60 * 1000;
+let closeTimer = null;
+
+// O admin pode desligar o fechamento automático em Configurações.
+async function autoCloseEnabled() {
+  const settings = await Settings.findOne({ key: "default" }).lean();
+  return !settings || settings.autoClose !== false;
+}
+
+// Agenda o fechamento da rodada aberta para o INSTANTE exato (1º jogo − 2h).
+// É o complemento do cron de 30 min: o cron cobre reinícios e atrasos, o timer
+// garante a precisão. Rodadas com manualOverride são ignoradas.
+async function armCloseTimer() {
+  if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+  if (!(await autoCloseEnabled())) return;
+
+  const round = await Round.findOne({ status: "open" }).sort({ number: -1 });
+  if (!round || round.manualOverride) return;
+  const target = closesAt(round);
+  if (target == null) return; // jogo ainda "a definir": sem alvo para agendar
+
+  const delay = target - Date.now();
+  if (delay <= 0) {
+    const res = await autoCloseIfDue(round);
+    if (res.closed) {
+      logger.info({ round: round.number, ticketsUpdated: res.ticketsUpdated },
+        "rodada fechada automaticamente (2h antes do 1º jogo)");
+    }
+    return armCloseTimer(); // estado mudou: avalia a próxima rodada aberta
+  }
+
+  closeTimer = setTimeout(async () => {
+    try {
+      const current = await Round.findOne({ status: "open" }).sort({ number: -1 });
+      const res = await autoCloseIfDue(current);
+      if (res.closed) {
+        logger.info({ round: res.round && res.round.number, ticketsUpdated: res.ticketsUpdated },
+          "rodada fechada automaticamente (2h antes do 1º jogo)");
+      }
+    } catch (e) {
+      logger.warn({ err: String(e && e.message) }, "falha no fechamento agendado");
+    }
+    await armCloseTimer();
+  }, Math.min(delay, MAX_TIMER_MS));
+  logger.info({ round: round.number, inSeconds: Math.round(Math.min(delay, MAX_TIMER_MS) / 1000) }, "fechamento da rodada agendado");
+}
 
 function startJobs() {
   // Local e produção compartilham o mesmo Atlas: apenas UM ambiente roda os jobs
@@ -22,23 +71,18 @@ function startJobs() {
       if (res && res.round != null) {
         const round = await Round.findOne({ number: res.round });
         if (round) await processRoundScoring(round._id);
-        // Fecha duas horas antes do primeiro jogo da rodada.
-        const syncedRound = await Round.findOne({ number: res.round });
-        const firstStart = syncedRound && (syncedRound.matches || []).reduce((earliest, match) => {
-          if (!match.startsAt) return earliest;
-          const value = new Date(match.startsAt).getTime();
-          return Number.isFinite(value) && (earliest == null || value < earliest) ? value : earliest;
-        }, null);
-        const settings = await Settings.findOne({ key: "default" }).lean();
-        if ((!settings || settings.autoClose !== false) && firstStart && Date.now() >= firstStart - 2 * 60 * 60 * 1000) {
-          const r = await Round.findOne({ number: res.round });
-          if (r && r.status === "open") {
-            r.status = "closed";
-            await r.save();
-            logger.info({ round: r.number }, "rodada fechada automaticamente");
+        // Rede de segurança do fechamento automático: o timer abaixo fecha no
+        // instante exato (1º jogo − 2h); isto cobre reinício do processo.
+        if (await autoCloseEnabled()) {
+          const closedRes = await autoCloseIfDue(round);
+          if (closedRes.closed) {
+            logger.info({ round: round.number, ticketsUpdated: closedRes.ticketsUpdated },
+              "rodada fechada automaticamente (2h antes do 1º jogo)");
           }
         }
       }
+      // A data do 1º jogo pode ter mudado neste sync: reagenda o instante exato.
+      await armCloseTimer();
     } catch (e) {
       logger.warn({ err: String(e && e.message) }, "falha no sync da rodada");
     }
@@ -116,8 +160,12 @@ function startJobs() {
   }
 
   async function livePollLoop() {
-    // Retorna a rodada aberta se houver jogos relevantes, ou null caso contrário.
-    const round = await Round.findOne({ status: "open" }).lean();
+    // Retorna a rodada se houver jogos relevantes, ou null caso contrário.
+    // Inclui "closed": depois do fechamento (2h antes do 1º jogo) os placares ao
+    // vivo continuam sendo atualizados — só os palpites param.
+    const round = await Round.findOne({ status: { $in: ["open", "closed"] } })
+      .sort({ number: -1 })
+      .lean();
     if (!round || !round.matches || !round.matches.length) return null;
 
     const now = new Date();
@@ -170,6 +218,10 @@ function startJobs() {
   // Inicia o timer de polling ao vivo
   liveTimer = setTimeout(tick, 15 * 60 * 1000);
   logger.info({ livePollSeconds: config.football.livePollSeconds }, "jobs agendados");
+
+  // Fechamento no instante exato: agenda já no boot (cobre reinício do processo,
+  // quando o cron de 30 min ainda não rodou e o timer foi perdido).
+  armCloseTimer().catch((e) => logger.warn({ err: String(e && e.message) }, "falha ao agendar o fechamento da rodada"));
 }
 
 module.exports = { startJobs };

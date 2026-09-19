@@ -5,6 +5,7 @@ const Payment = require("../models/Payment");
 const settingsService = require("../services/settingsService");
 const { syncRound } = require("../integrations/football/sync");
 const { processRoundScoring } = require("../services/scoringService");
+const { closeRound: closeRoundService, reopenRound: reopenRoundService, setAutomatic, closesAt } = require("../services/roundLifecycle");
 const { badRequest, notFound } = require("../utils/errors");
 
 async function overview(req, res, next) {
@@ -19,7 +20,17 @@ async function overview(req, res, next) {
     return res.json({
       users, rounds, tickets,
       revenueCents: (revenue[0] && revenue[0].total) || 0,
-      currentRound: current ? { id: String(current._id), number: current.number, status: current.status, deadline: current.deadline } : null,
+      currentRound: current ? {
+        id: String(current._id),
+        number: current.number,
+        status: current.status,
+        deadline: current.deadline,
+        manualOverride: Boolean(current.manualOverride),
+        closesAt: (() => {
+          const ms = closesAt(current);
+          return ms == null ? null : new Date(ms);
+        })(),
+      } : null,
     });
   } catch (e) { return next(e); }
 }
@@ -37,24 +48,44 @@ async function setDeadline(req, res, next) {
   } catch (e) { return next(e); }
 }
 
+// Fechar/reabrir na mão marca a rodada como "controle manual": a regra automática
+// (1º jogo − 2h) deixa de agir sobre ela até o admin devolver o controle. Os tickets
+// são movidos junto (released <-> closed) pelo service, na mesma operação.
 async function closeRound(req, res, next) {
   try {
-    const round = await Round.findById(req.params.id);
-    if (!round) throw notFound("Rodada não encontrada.");
-    round.status = "closed";
-    await round.save();
-    await Ticket.updateMany({ roundId: round._id, status: "released" }, { $set: { status: "closed" } });
-    return res.json({ ok: true });
+    const result = await closeRoundService(req.params.id, { manual: true });
+    if (!result.round) throw notFound("Rodada não encontrada.");
+    return res.json({
+      ok: true,
+      roundId: String(result.round._id),
+      status: result.round.status,
+      manualOverride: Boolean(result.round.manualOverride),
+      ticketsUpdated: result.ticketsUpdated,
+    });
   } catch (e) { return next(e); }
 }
 
 async function reopenRound(req, res, next) {
   try {
-    const round = await Round.findById(req.params.id);
-    if (!round) throw notFound("Rodada não encontrada.");
-    round.status = "open";
-    await round.save();
-    return res.json({ ok: true });
+    const result = await reopenRoundService(req.params.id, { manual: true });
+    if (!result.round) throw notFound("Rodada não encontrada.");
+    return res.json({
+      ok: true,
+      roundId: String(result.round._id),
+      status: result.round.status,
+      manualOverride: Boolean(result.round.manualOverride),
+      ticketsUpdated: result.ticketsUpdated,
+    });
+  } catch (e) { return next(e); }
+}
+
+// Devolve a rodada à regra automática (limpa o controle manual). O próximo sync ou
+// o cron volta a fechá-la quando a janela (1º jogo − 2h) vencer.
+async function setRoundAutomatic(req, res, next) {
+  try {
+    const result = await setAutomatic(req.params.id);
+    if (!result.round) throw notFound("Rodada não encontrada.");
+    return res.json({ ok: true, roundId: String(result.round._id), status: result.round.status, manualOverride: false });
   } catch (e) { return next(e); }
 }
 
@@ -152,4 +183,4 @@ async function updateSettings(req, res, next) {
   catch (e) { return next(e); }
 }
 
-module.exports = { overview, setDeadline, closeRound, reopenRound, syncNow, setRoundMatches, addMatch, listUsers, listTickets, setUserRole, getSettings, updateSettings };
+module.exports = { overview, setDeadline, closeRound, reopenRound, setRoundAutomatic, syncNow, setRoundMatches, addMatch, listUsers, listTickets, setUserRole, getSettings, updateSettings };

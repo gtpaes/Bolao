@@ -2,12 +2,21 @@
 import { loadTemplate, run } from "./loader.js";
 import { stateNode } from "../../utils/states.js";
 import { esc } from "../../utils/dom.js";
-import { brl, dateShort } from "../../utils/format.js";
+import { brl, dateShort, dateTime } from "../../utils/format.js";
 import { getCurrentRound, listRounds } from "../api/rounds.js";
 import { openModal } from "../../components/modal.js";
 import { toastSuccess, toastInfo, toastError } from "../../components/toast.js";
 import { request } from "../api/client.js";
 import { currentRole } from "../api/auth.js";
+
+/* datetime-local espera "YYYY-MM-DDTHH:MM" no fuso local do navegador. */
+function toLocalInput(v) {
+  if (!v) return "";
+  const d = v instanceof Date ? v : new Date(v);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 /* ---------------- Dashboard Admin ---------------- */
 export async function adminDashboard(view) {
@@ -27,10 +36,13 @@ export async function adminDashboard(view) {
     let round = null;
     round = overview.currentRound || null;
     if (round) {
+      // Fechamento = instante real (deadline salvo ou 1º jogo − 2h), não só o deadline.
+      const control = round.manualOverride ? "Manual (admin)" : "Automático";
       curHost.innerHTML = `
         <div class="li"><span class="li-key">Rodada</span><span class="li-val">${esc(String(round.number))}</span></div>
         <div class="li"><span class="li-key">Status</span><span class="li-val">${esc(String(round.status || "—"))}</span></div>
-        <div class="li"><span class="li-key">Fechamento</span><span class="li-val">${esc(dateShort(round.deadline))}</span></div>`;
+        <div class="li"><span class="li-key">Fechamento</span><span class="li-val">${esc(dateTime(round.closesAt || round.deadline))}</span></div>
+        <div class="li"><span class="li-key">Controle</span><span class="li-val">${esc(control)}</span></div>`;
     } else {
       curHost.replaceChildren(stateNode("empty", { title: "Sem rodada aberta", message: "Crie ou abra uma rodada para começar." }));
     }
@@ -46,6 +58,19 @@ export async function adminRound(view) {
     try { rounds = (await listRounds()).rounds || []; } catch (e) { rounds = []; }
     const current = rounds[0] || null;
 
+    // Instante real de fechamento: o deadline salvo no admin vence; senão, 2h antes
+    // do 1º jogo. É esse valor que o campo de fechamento mostra.
+    const closesAt = current ? (current.closes_at || current.deadline || null) : null;
+    const controlHint = !current
+      ? "Sincronize uma rodada para configurar."
+      : current.manual_override
+        ? "Controle manual: você fechou/reabriu esta rodada. A regra automática (2h antes do 1º jogo) está desligada até você voltar ao automático."
+        : `Controle automático: fecha sozinha em ${dateTime(closesAt)} (2h antes do 1º jogo).`;
+    const setControlHint = (text) => {
+      const el = view.querySelector("#r-control");
+      if (el) el.textContent = text;
+    };
+
     formHost.innerHTML = `
       <div class="card">
         <div class="card-header"><h2 class="card-title"><i data-lucide="calendar-clock"></i> Configuração da rodada</h2></div>
@@ -54,12 +79,14 @@ export async function adminRound(view) {
             <div class="field"><label for="r-number">Número de rodada</label><input class="input" id="r-number" type="number" min="1" value="${current ? esc(current.number) : ""}" placeholder="Ex. 3" /></div>
             <div class="field"><label for="r-status">Status</label><select class="select" id="r-status"><option value="open">Aberto</option><option value="closed">Fechado</option></select></div>
             <div class="field"><label for="r-open">Abertura</label><input class="input" id="r-open" type="datetime-local" /></div>
-            <div class="field"><label for="r-close-at">Fechamento</label><input class="input" id="r-close-at" type="datetime-local" /></div>
+            <div class="field"><label for="r-close-at">Fechamento</label><input class="input" id="r-close-at" type="datetime-local" value="${esc(toLocalInput(closesAt))}" /></div>
           </div>
+          <p class="t-muted t-small" id="r-control">${esc(controlHint)}</p>
           <div style="display:flex;gap:var(--space-3);flex-wrap:wrap">
             <button class="btn btn-primary" id="r-save"><i data-lucide="save"></i> Salvar</button>
             <button class="btn btn-ghost" id="r-close">Fechar rodada</button>
             <button class="btn btn-ghost" id="r-reopen">Reabrir rodada</button>
+            <button class="btn btn-ghost" id="r-automatic">Voltar ao automático</button>
           </div>
         </div>
       </div>`;
@@ -73,13 +100,33 @@ export async function adminRound(view) {
         toastSuccess("Salvo", "Deadline atualizado.");
       } catch (e) { toastError("Não foi possível salvar", e.message); }
     });
+    // Fechar/reabrir assume o controle manual: a rodada deixa de fechar sozinha até
+    // o admin devolver ao automático.
     view.querySelector("#r-close").addEventListener("click", async () => {
-      try { await request(`/admin/rounds/${roundId}/close`, { method: "POST" }); toastSuccess("Rodada fechada", "Novos palpites foram bloqueados."); }
-      catch (e) { toastError("Não foi possível fechar", e.message); }
+      if (!roundId) return toastError("Rodada não encontrada", "Sincronize uma rodada primeiro.");
+      try {
+        const r = await request(`/admin/rounds/${roundId}/close`, { method: "POST" });
+        const n = r.ticketsUpdated || 0;
+        setControlHint("Controle manual: rodada fechada por você. A regra automática está desligada.");
+        toastSuccess("Rodada fechada", `${n} ticket(s) bloqueado(s) para palpites.`);
+      } catch (e) { toastError("Não foi possível fechar", e.message); }
     });
     view.querySelector("#r-reopen").addEventListener("click", async () => {
-      try { await request(`/admin/rounds/${roundId}/reopen`, { method: "POST" }); toastSuccess("Rodada reaberta", "Palpites liberados novamente."); }
-      catch (e) { toastError("Não foi possível reabrir", e.message); }
+      if (!roundId) return toastError("Rodada não encontrada", "Sincronize uma rodada primeiro.");
+      try {
+        const r = await request(`/admin/rounds/${roundId}/reopen`, { method: "POST" });
+        const n = r.ticketsUpdated || 0;
+        setControlHint("Controle manual: rodada reaberta por você. A regra automática está desligada.");
+        toastSuccess("Rodada reaberta", `${n} ticket(s) liberado(s) para palpites.`);
+      } catch (e) { toastError("Não foi possível reabrir", e.message); }
+    });
+    view.querySelector("#r-automatic").addEventListener("click", async () => {
+      if (!roundId) return toastError("Rodada não encontrada", "Sincronize uma rodada primeiro.");
+      try {
+        await request(`/admin/rounds/${roundId}/automatic`, { method: "POST" });
+        setControlHint("Controle automático: a rodada volta a fechar 2h antes do 1º jogo.");
+        toastSuccess("Controle automático", "A rodada volta a fechar sozinha 2h antes do 1º jogo.");
+      } catch (e) { toastError("Não foi possível alterar", e.message); }
     });
 
   });

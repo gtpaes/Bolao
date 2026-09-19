@@ -61,6 +61,7 @@ router.get("/admin/overview", authJwt, requireRole("admin", "dev"), adminControl
 router.patch("/admin/rounds/:id/deadline", authJwt, requireRole("admin", "dev"), adminController.setDeadline);
 router.post("/admin/rounds/:id/close", authJwt, requireRole("admin", "dev"), adminController.closeRound);
 router.post("/admin/rounds/:id/reopen", authJwt, requireRole("admin", "dev"), adminController.reopenRound);
+router.post("/admin/rounds/:id/automatic", authJwt, requireRole("admin", "dev"), adminController.setRoundAutomatic);
 router.post("/admin/sync/round", authJwt, requireRole("admin", "dev"), adminController.syncNow);
 router.patch("/admin/rounds/:id/matches", authJwt, requireRole("admin", "dev"), adminController.setRoundMatches);
 router.post("/admin/rounds/:id/matches", authJwt, requireRole("admin", "dev"), adminController.addMatch);
