@@ -59,6 +59,15 @@ export function logout() {
   remove(SESSION_KEY);
 }
 
+export async function refreshProfile() {
+  const data = await request("/users/me");
+  const session = currentSession() || {};
+  const next = { ...session, role: data.role || session.role, username: data.username || session.username, email: data.email || session.email, userId: data.id || session.userId };
+  set(SESSION_KEY, next);
+  set(PROFILE_KEY, data);
+  return data;
+}
+
 /* ---------------- Guards ---------------- */
 export function requireAuth() {
   if (!isAuthenticated()) {

@@ -47,6 +47,7 @@ function toRoundDTO(r) {
     providerStatus: o.providerStatus,
     date: roundStartDate(o.matches),
     deadline: o.deadline,
+    scoringRules: o.scoringRules || { exact: 10, draw: 6, winner: 4, miss: 0 },
     syncedAt: o.syncedAt,
   };
 }

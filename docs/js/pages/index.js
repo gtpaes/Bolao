@@ -11,7 +11,6 @@ import * as live from "./live.js";
 import * as profile from "./profile.js";
 import * as history from "./history.js";
 import * as admin from "./admin.js";
-import * as dev from "./dev.js";
 
 export const pages = {
   dashboard: dashboard,
@@ -32,11 +31,4 @@ export const pages = {
   "admin/users": { render: admin.adminUsers },
   "admin/tickets": { render: admin.adminTickets },
   "admin/settings": { render: admin.adminSettings },
-  "admin/logs": { render: admin.adminLogs },
-
-  dev: { render: dev.devDashboard },
-  "dev/monitoring": { render: dev.devMonitoring },
-  "dev/integrations": { render: dev.devIntegrations },
-  "dev/logs": { render: dev.devLogs },
-  "dev/diagnostics": { render: dev.devDiagnostics },
 };

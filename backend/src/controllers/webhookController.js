@@ -39,7 +39,7 @@ async function mercadopago(req, res, next) {
     if (type !== "payment") return res.json({ ok: true, ignored: true });
     const gatewayPaymentId = String((body.data && body.data.id) || req.query["data.id"] || "");
     if (!gatewayPaymentId) throw badRequest("data.id ausente.");
-    const eventId = String(body.id || `${gatewayPaymentId}:${Date.now()}`);
+    const eventId = String(body.id || `${gatewayPaymentId}:${type}`);
 
     // Busca o status real no gateway (não confia no corpo do webhook).
     const { fetchGatewayPayment } = require("../integrations/payment/mercadopago");

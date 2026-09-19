@@ -1,7 +1,7 @@
 /* js/app.js — Inicialização do shell do app (index.html) */
 
 import { initTheme, toggleTheme } from "./theme.js";
-import { currentProfile, currentRole, logout, requireAuth } from "./api/auth.js";
+import { currentProfile, currentRole, logout, requireAuth, refreshProfile } from "./api/auth.js";
 import { sidebarHtml, bottomNavHtml, moreSheetHtml } from "./nav.js";
 import { initRouter, navigate } from "./router.js";
 import { hydrateIcons, icon, byId, qs } from "../utils/dom.js";
@@ -10,8 +10,9 @@ import { openModal } from "../components/modal.js";
 import { confirmDialog } from "../components/confirm.js";
 import { toastSuccess, toastInfo } from "../components/toast.js";
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if (!requireAuth()) return;
+  try { await refreshProfile(); } catch (e) { /* sessão local continua útil se a API estiver temporariamente indisponível */ }
   initTheme();
 
   const profile = currentProfile();
@@ -89,6 +90,7 @@ function openDrawer() {
         <button class="btn btn-ghost btn-block btn-sm" data-logout>
           <i data-lucide="log-out"></i> Sair
         </button>
+        <div class="app-watermark">© 2026 Desenvolvido por Gustavo Paes</div>
       </div>
     </aside>`;
   document.body.appendChild(drawer);

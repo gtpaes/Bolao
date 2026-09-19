@@ -1,4 +1,6 @@
 const Ticket = require("../models/Ticket");
+const TicketCounter = require("../models/TicketCounter");
+const Settings = require("../models/Settings");
 const Round = require("../models/Round");
 const Payment = require("../models/Payment");
 const logger = require("../config/logger");
@@ -21,27 +23,22 @@ async function createPayment(userId, quantity) {
 
   try {
     const round = await openRoundOrThrow();
-    const totalCents = qty * UNIT_PRICE_CENTS;
+    const settings = await Settings.findOne({ key: "default" }).lean();
+    const unitPriceCents = settings && Number(settings.priceCents) > 0 ? Number(settings.priceCents) : UNIT_PRICE_CENTS;
+    const totalCents = qty * unitPriceCents;
 
     logger.info({ userId, quantity: qty, roundId: String(round._id), totalCents }, "iniciando criacao de pagamento");
 
-    const last = await Ticket.find({ userId, roundId: round._id }).sort({ number: -1 }).limit(1).lean();
-    const startNumber = last.length ? last[0].number + 1 : 1;
-    const docs = [];
-    for (let i = 0; i < qty; i += 1) {
-      docs.push({ userId, roundId: round._id, number: startNumber + i, unitPriceCents: UNIT_PRICE_CENTS, status: "waiting_payment", picks: [], points: 0 });
-    }
-    const created = await Ticket.insertMany(docs, { ordered: true });
     const payment = await Payment.create({
       userId,
-      ticketIds: created.map((t) => t._id),
+      roundId: round._id,
+      quantity: qty,
+      ticketIds: [],
       amountCents: totalCents,
       status: "pending",
       idempotencyKey: newIdempotencyKey("pay"),
       expiresAt: new Date(Date.now() + 30 * 60 * 1000),
     });
-    await Ticket.updateMany({ _id: { $in: created.map((t) => t._id) } }, { $set: { paymentId: payment._id } });
-
     const user = await require("../models/User").findById(userId).lean();
     const payerEmail = user && user.email ? user.email : "comprador@bolao.local";
     const charge = await createPixCharge({
@@ -74,7 +71,7 @@ async function createPayment(userId, quantity) {
 async function getPaymentStatus(userId, paymentId) {
   const p = await Payment.findById(paymentId).lean();
   if (!p || String(p.userId) !== String(userId)) throw notFound("Pagamento não encontrado.");
-  refreshFromGateway(p).catch(() => {});
+  await refreshFromGateway(p);
   const current = await Payment.findById(paymentId).lean();
   return { status: current.status, message: statusMessage(current.status) };
 }
@@ -88,12 +85,55 @@ async function refreshFromGateway(payment) {
   if (!payment || payment.status !== "pending" || !payment.gatewayPaymentId) return payment;
   const remote = await fetchGatewayPayment(payment.gatewayPaymentId);
   if (!remote || !remote.status) return payment;
-  if (remote.status === payment.status) return payment;
-  await Payment.updateOne({ _id: payment._id }, { $set: { status: remote.status } });
-  if (remote.status === "approved") {
-    await Ticket.updateMany({ _id: { $in: payment.ticketIds || [] } }, { $set: { status: "released" } });
-  }
+  if (remote.status === payment.status && !(remote.status === "approved" && !(payment.ticketIds || []).length)) return payment;
+  if (remote.status === "approved") return releasePaymentTickets(payment._id, "approved");
+  if (payment.status !== "approved") await Payment.updateOne({ _id: payment._id }, { $set: { status: remote.status } });
   return Payment.findById(payment._id).lean();
+}
+
+async function releasePaymentTickets(paymentId, status) {
+  const session = await Payment.startSession();
+  let result;
+  try {
+    await session.withTransaction(async () => {
+      const payment = await Payment.findById(paymentId).session(session);
+      if (!payment) throw notFound("Pagamento não encontrado.");
+      if (payment.status === "approved" && payment.ticketIds && payment.ticketIds.length) {
+        result = payment.toObject();
+        return;
+      }
+      if (status !== "approved") {
+        if (payment.status !== "approved") payment.status = status;
+        await payment.save({ session });
+        result = payment.toObject();
+        return;
+      }
+      const counter = await TicketCounter.findOneAndUpdate(
+        { userId: payment.userId, roundId: payment.roundId },
+        { $setOnInsert: { nextNumber: 0 }, $inc: { nextNumber: payment.quantity } },
+        { upsert: true, new: true, session }
+      );
+      const startNumber = counter.nextNumber - payment.quantity + 1;
+      const docs = Array.from({ length: payment.quantity }, (_, index) => ({
+        userId: payment.userId,
+        roundId: payment.roundId,
+        number: startNumber + index,
+        unitPriceCents: Math.floor(payment.amountCents / payment.quantity),
+        status: "released",
+        picks: [],
+        points: 0,
+        paymentId: payment._id,
+      }));
+      const created = await Ticket.insertMany(docs, { ordered: true, session });
+      payment.ticketIds = created.map((ticket) => ticket._id);
+      payment.status = "approved";
+      await payment.save({ session });
+      result = payment.toObject();
+    });
+  } finally {
+    await session.endSession();
+  }
+  return result;
 }
 
 // Chamado SOMENTE pelo webhook (assinatura validada na rota). Idempotente.
@@ -106,16 +146,8 @@ async function confirmPaymentByGateway({ gatewayPaymentId, status, webhookEventI
   const payment = await Payment.findOne({ gatewayPaymentId });
   if (!payment) throw notFound("Pagamento não encontrado.");
   if (webhookEventId) payment.webhookEventId = webhookEventId;
-  if (payment.status === "approved" && status === "approved") {
-    await payment.save();
-    return payment.toObject();
-  }
-  payment.status = status;
-  await payment.save();
-  if (status === "approved") {
-    await Ticket.updateMany({ _id: { $in: payment.ticketIds || [] } }, { $set: { status: "released" } });
-  }
-  return payment.toObject();
+  if (payment.status === "approved" && payment.ticketIds && payment.ticketIds.length) return payment.toObject();
+  return releasePaymentTickets(payment._id, status);
 }
 
 module.exports = { createPayment, getPaymentStatus, confirmPaymentByGateway, UNIT_PRICE_CENTS };

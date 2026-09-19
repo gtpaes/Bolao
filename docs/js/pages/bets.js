@@ -1,6 +1,6 @@
 /* js/pages/bets.js — Apostas públicas da rodada. */
 import { loadTemplate, run } from "./loader.js";
-import { listPublicPicks } from "../api/picks.js";
+import { listPublicPicks, getPublicTicket } from "../api/picks.js";
 import { stateNode } from "../../utils/states.js";
 import { esc, hydrateIcons } from "../../utils/dom.js";
 
@@ -13,12 +13,18 @@ export async function render(view) {
 
     let data;
     try {
-      data = await listPublicPicks();
+      const hashPath = (window.location.hash || "").replace(/^#\/?/, "").split("/");
+      const ticketId = hashPath[0] === "bets" && hashPath[1] ? decodeURIComponent(hashPath[1]) : null;
+      data = ticketId ? await getPublicTicket(ticketId) : await listPublicPicks();
     } catch (error) {
       host.replaceChildren(stateNode("error", { title: "Não foi possível carregar as apostas", message: error.message || "Tente novamente." }));
       return;
     }
 
+    if (data.visible === false) {
+      host.replaceChildren(stateNode("off", { title: "Apostas protegidas", message: "Os palpites de todos os jogadores serão exibidos quando a rodada for encerrada." }));
+      return;
+    }
     if (!data.round || !data.tickets || !data.tickets.length) {
       host.replaceChildren(stateNode("empty", { title: "Nenhuma aposta registrada", message: "Os palpites aparecerão aqui depois que os jogadores enviarem suas apostas." }));
       return;

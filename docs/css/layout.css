@@ -105,6 +105,7 @@
 .sb-link.active .sb-ico { color: var(--green-500); }
 
 .sb-footer { padding: var(--space-4) var(--space-5); border-top: 1px solid var(--border); }
+.app-watermark { margin-top: var(--space-3); color: var(--muted-2); font-size: .68rem; line-height: 1.35; text-align: center; }
 
 /* User chip (sidebar bottom / header) */
 .user-chip { display: flex; align-items: center; gap: var(--space-3); }

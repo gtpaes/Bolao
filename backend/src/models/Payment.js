@@ -3,6 +3,8 @@ const { Schema, model, Types } = require("mongoose");
 const paymentSchema = new Schema(
   {
     userId: { type: Types.ObjectId, ref: "User", required: true, index: true },
+    roundId: { type: Types.ObjectId, ref: "Round", required: true, index: true },
+    quantity: { type: Number, required: true, min: 1, max: 100 },
     ticketIds: [{ type: Types.ObjectId, ref: "Ticket" }],
     amountCents: { type: Number, required: true, min: 1 },
     status: {

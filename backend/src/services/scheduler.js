@@ -5,6 +5,7 @@ const { syncRound, applyLive } = require("../integrations/football/sync");
 const { listLive } = require("../integrations/football/client");
 const { processRoundScoring } = require("../services/scoringService");
 const Round = require("../models/Round");
+const Settings = require("../models/Settings");
 
 function startJobs() {
   // Local e produção compartilham o mesmo Atlas: apenas UM ambiente roda os jobs
@@ -21,8 +22,15 @@ function startJobs() {
       if (res && res.round != null) {
         const round = await Round.findOne({ number: res.round });
         if (round) await processRoundScoring(round._id);
-        // Fecha palpites automaticamente quando passa do último jogo + margem.
-        if (res.latestAt && Date.now() > res.latestAt + config.football.matchDurationMinutes * 60 * 1000) {
+        // Fecha duas horas antes do primeiro jogo da rodada.
+        const syncedRound = await Round.findOne({ number: res.round });
+        const firstStart = syncedRound && (syncedRound.matches || []).reduce((earliest, match) => {
+          if (!match.startsAt) return earliest;
+          const value = new Date(match.startsAt).getTime();
+          return Number.isFinite(value) && (earliest == null || value < earliest) ? value : earliest;
+        }, null);
+        const settings = await Settings.findOne({ key: "default" }).lean();
+        if ((!settings || settings.autoClose !== false) && firstStart && Date.now() >= firstStart - 2 * 60 * 60 * 1000) {
           const r = await Round.findOne({ number: res.round });
           if (r && r.status === "open") {
             r.status = "closed";

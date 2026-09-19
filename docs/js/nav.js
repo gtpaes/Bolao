@@ -20,15 +20,6 @@ const ADMIN = [
   { route: "admin/users", label: "Gerenciar Usuários", icon: "users" },
   { route: "admin/tickets", label: "Gerenciar Tickets", icon: "ticket-percent" },
   { route: "admin/settings", label: "Configurações", icon: "sliders-horizontal" },
-  { route: "admin/logs", label: "Logs Admin", icon: "scroll-text" },
-];
-
-const DEV = [
-  { route: "dev", label: "Dashboard Dev", icon: "code-2" },
-  { route: "dev/monitoring", label: "Monitoramento", icon: "activity" },
-  { route: "dev/integrations", label: "API/Integrações", icon: "plug" },
-  { route: "dev/logs", label: "Logs do Sistema", icon: "terminal" },
-  { route: "dev/diagnostics", label: "Diagnóstico", icon: "stethoscope" },
 ];
 
 const MOBILE_PRIMARY = ["dashboard", "round", "picks", "bets", "ranking"];
@@ -36,7 +27,7 @@ const MOBILE_PRIMARY = ["dashboard", "round", "picks", "bets", "ranking"];
 export function roleLinks(role) {
   const links = [...MAIN];
   if (role === "admin") links.push(...ADMIN);
-  if (role === "dev") links.push(...ADMIN, ...DEV);
+  if (role === "dev") links.push(...ADMIN);
   return links;
 }
 
@@ -58,7 +49,7 @@ export function sidebarHtml(role) {
     nav += `<div class="sb-group-label">Início</div>` + MAIN.map((it) => linkHtml(it, false)).join("");
   }
   if (role === "admin") nav += `<div class="sb-group-label">Administração</div>` + ADMIN.map((it) => linkHtml(it, false)).join("");
-  if (role === "dev") nav += `<div class="sb-group-label">Administração</div>` + ADMIN.map((it) => linkHtml(it, false)).join("") + `<div class="sb-group-label">Desenvolvedor</div>` + DEV.map((it) => linkHtml(it, false)).join("");
+  if (role === "dev") nav += `<div class="sb-group-label">Administração</div>` + ADMIN.map((it) => linkHtml(it, false)).join("");
   return nav;
 }
 

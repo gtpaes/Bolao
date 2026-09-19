@@ -7,13 +7,13 @@ function outcome(home, away) {
   return "draw";
 }
 
-function scorePick(predictedHome, predictedAway, actualHome, actualAway) {
-  if (predictedHome === actualHome && predictedAway === actualAway) return POINTS.exact;
+function scorePick(predictedHome, predictedAway, actualHome, actualAway, rules = POINTS) {
+  if (predictedHome === actualHome && predictedAway === actualAway) return Number(rules.exact ?? POINTS.exact);
   const predicted = outcome(predictedHome, predictedAway);
   const actual = outcome(actualHome, actualAway);
-  if (predicted !== actual) return POINTS.miss;
-  if (actual === "draw") return POINTS.draw;
-  return POINTS.winner;
+  if (predicted !== actual) return Number(rules.miss ?? POINTS.miss);
+  if (actual === "draw") return Number(rules.draw ?? POINTS.draw);
+  return Number(rules.winner ?? POINTS.winner);
 }
 
 module.exports = { POINTS, outcome, scorePick };

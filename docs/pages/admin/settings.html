@@ -10,10 +10,10 @@
   <div class="card-header"><h2 class="card-title"><i data-lucide="sliders-horizontal"></i> Regras de pontuação</h2></div>
   <div class="card-body">
     <div class="scoring-grid">
-      <div class="scoring-item"><span class="si-label">Placar exato</span><span class="si-pts">10</span></div>
-      <div class="scoring-item"><span class="si-label">Empate correto</span><span class="si-pts">6</span></div>
-      <div class="scoring-item"><span class="si-label">Vencedor correto</span><span class="si-pts">4</span></div>
-      <div class="scoring-item"><span class="si-label">Errou</span><span class="si-pts">0</span></div>
+      <div class="scoring-item"><label class="si-label" for="cfg-exact">Placar exato</label><input class="input" id="cfg-exact" type="number" min="0" value="10" /></div>
+      <div class="scoring-item"><label class="si-label" for="cfg-draw">Empate correto</label><input class="input" id="cfg-draw" type="number" min="0" value="6" /></div>
+      <div class="scoring-item"><label class="si-label" for="cfg-winner">Vencedor correto</label><input class="input" id="cfg-winner" type="number" min="0" value="4" /></div>
+      <div class="scoring-item"><label class="si-label" for="cfg-miss">Errou</label><input class="input" id="cfg-miss" type="number" min="0" value="0" /></div>
     </div>
     <div class="divider"></div>
     <div class="field"><label for="cfg-price">Preço por ticket (R$)</label><input class="input" type="number" id="cfg-price" value="10.00" step="0.01" /></div>

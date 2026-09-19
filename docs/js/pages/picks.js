@@ -2,7 +2,7 @@
 import { loadTemplate, run } from "./loader.js";
 import { getCurrentRound } from "../api/rounds.js";
 import { listMatches } from "../api/matches.js";
-import { listTickets, savePicks } from "../api/tickets.js";
+import { listTickets, getTicket, savePicks } from "../api/tickets.js";
 import { stateNode } from "../../utils/states.js";
 import { esc } from "../../utils/dom.js";
 import { dateTime, ticketCode } from "../../utils/format.js";
@@ -56,20 +56,43 @@ export async function render(view) {
         <div class="card-header"><h2 class="card-title"><i data-lucide="target"></i> Placares da rodada</h2></div>
         <div id="picks-matches"></div>
         <div class="card-footer">
-          <button class="btn btn-primary btn-lg btn-block" id="save-picks" ${closed ? "disabled" : ""}><i data-lucide="save"></i> Salvar palpites</button>
+          <button class="btn btn-primary btn-lg btn-block" id="save-picks" ${closed || activeTicket.status !== "released" ? "disabled" : ""}><i data-lucide="save"></i> Salvar palpites</button>
         </div>
       </div>`;
     formHost.replaceChildren(form);
-    form.querySelector("#picks-matches").replaceChildren(...matches.map((m, idx) => pickRow(m, closed, idx)));
+    const matchesHost = form.querySelector("#picks-matches");
+    const saveBtn = form.querySelector("#save-picks");
+
+    const loadTicketPicks = async (ticket) => {
+      saveBtn.disabled = true;
+      matchesHost.replaceChildren(...matches.map((m, idx) => pickRow(m, closed || ticket.status !== "released", idx)));
+      try {
+        const data = await getTicket(ticket.id);
+        const picksByMatch = new Map((data.ticket && data.ticket.picks || []).map((pick) => [String(pick.matchExternalId), pick]));
+        matchesHost.querySelectorAll(".pick-row").forEach((row) => {
+          const pick = picksByMatch.get(String(row.dataset.matchId));
+          if (!pick) return;
+          const home = row.querySelector("[data-side='home']");
+          const away = row.querySelector("[data-side='away']");
+          if (home) home.value = pick.home;
+          if (away) away.value = pick.away;
+        });
+        saveBtn.disabled = closed || ticket.status !== "released";
+      } catch (error) {
+        matchesHost.replaceChildren(stateNode("error", { title: "Não foi possível carregar este ticket", message: error.message || "Tente novamente." }));
+      }
+    };
+
+    await loadTicketPicks(activeTicket);
 
     picker.querySelectorAll("[data-ticket]").forEach((btn) =>
       btn.addEventListener("click", () => {
         picker.querySelectorAll("[data-ticket]").forEach((b) => b.classList.toggle("active", b === btn));
         selectedTicket = tickets.find((t) => t.id === btn.dataset.ticket) || selectedTicket;
+        loadTicketPicks(selectedTicket);
         toastSuccess("Ticket selecionado", `Palpitando com ${btn.textContent}`);
       }));
 
-    const saveBtn = form.querySelector("#save-picks");
     saveBtn.addEventListener("click", async () => {
       const picks = Array.from(form.querySelectorAll(".pick-row")).map((row) => ({
         matchId: row.dataset.matchId,

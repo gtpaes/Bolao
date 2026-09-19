@@ -19,6 +19,7 @@ export async function render(view) {
     const sumHost = view.querySelector('[data-host="round-summary"]');
     if (round) {
       const closed = isClosed(round);
+      const rules = round && round.scoringRules ? round.scoringRules : { exact: 10, draw: 6, winner: 4 };
       const badge = closed ? '<span class="badge badge-gray">Palpites encerrados</span>' : '<span class="badge badge-green">Palpites abertos</span>';
       const card = document.createElement("div");
       card.innerHTML = `
@@ -69,9 +70,9 @@ export async function render(view) {
         <div class="card-body">
           <p class="t-muted t-small" style="margin-bottom:var(--space-4)">Confira abaixo quanto vale cada acerto.</p>
           <div class="scoring-grid">
-            <div class="scoring-item"><span class="si-label">Placar exato</span><span class="si-pts">10 pontos</span></div>
-            <div class="scoring-item"><span class="si-label">Empate correto</span><span class="si-pts">6 pontos</span></div>
-            <div class="scoring-item"><span class="si-label">Vencedor correto (sem acertar o placar)</span><span class="si-pts">4 pontos</span></div>
+            <div class="scoring-item"><span class="si-label">Placar exato</span><span class="si-pts">${esc(String(rules.exact))} pontos</span></div>
+            <div class="scoring-item"><span class="si-label">Empate correto</span><span class="si-pts">${esc(String(rules.draw))} pontos</span></div>
+            <div class="scoring-item"><span class="si-label">Vencedor correto (sem acertar o placar)</span><span class="si-pts">${esc(String(rules.winner))} pontos</span></div>
             <div class="scoring-item"><span class="si-label">Erro</span><span class="si-pts">0 pontos</span></div>
           </div>
         </div>

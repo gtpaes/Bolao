@@ -6,6 +6,7 @@ const roundController = require("../controllers/roundController");
 const ticketController = require("../controllers/ticketController");
 const paymentController = require("../controllers/paymentController");
 const rankingController = require("../controllers/rankingController");
+const historyController = require("../controllers/historyController");
 const adminController = require("../controllers/adminController");
 const webhookController = require("../controllers/webhookController");
 const { authJwt, requireRole } = require("../middlewares/auth");
@@ -20,9 +21,14 @@ router.get("/health", (req, res) => res.json({ ok: true, time: new Date().toISOS
 // Auth (público)
 router.post("/auth/register", authLimiter, authController.register);
 router.post("/auth/login", authLimiter, authController.login);
+router.post("/auth/recover", authLimiter, authController.requestReset);
+router.post("/auth/reset-password", authLimiter, authController.resetPassword);
 
 // Usuário
 router.get("/users/me", authJwt, userController.me);
+router.patch("/users/me", authJwt, userController.update);
+router.post("/users/me/password", authJwt, userController.password);
+router.get("/users/me/stats", authJwt, userController.stats);
 
 // Rodadas e jogos
 router.get("/rounds/current", authJwt, roundController.current);
@@ -45,6 +51,7 @@ router.get("/payments/:id/status", authJwt, paymentController.status);
 
 // Ranking
 router.get("/ranking", authJwt, rankingController.ranking);
+router.get("/history", authJwt, historyController.list);
 
 // Webhook Mercado Pago (assinatura validada no controller)
 router.post("/webhooks/mercadopago", express.json({ limit: "256kb" }), webhookController.mercadopago);
@@ -56,8 +63,11 @@ router.post("/admin/rounds/:id/close", authJwt, requireRole("admin", "dev"), adm
 router.post("/admin/rounds/:id/reopen", authJwt, requireRole("admin", "dev"), adminController.reopenRound);
 router.post("/admin/sync/round", authJwt, requireRole("admin", "dev"), adminController.syncNow);
 router.patch("/admin/rounds/:id/matches", authJwt, requireRole("admin", "dev"), adminController.setRoundMatches);
+router.post("/admin/rounds/:id/matches", authJwt, requireRole("admin", "dev"), adminController.addMatch);
 router.get("/admin/users", authJwt, requireRole("admin", "dev"), adminController.listUsers);
 router.patch("/admin/users/:id/role", authJwt, requireRole("dev"), adminController.setUserRole);
 router.get("/admin/tickets", authJwt, requireRole("admin", "dev"), adminController.listTickets);
+router.get("/admin/settings", authJwt, requireRole("admin", "dev"), adminController.getSettings);
+router.patch("/admin/settings", authJwt, requireRole("admin", "dev"), adminController.updateSettings);
 
 module.exports = router;

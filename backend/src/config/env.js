@@ -22,6 +22,16 @@ const config = {
   port: num("PORT", 3001),
   nodeEnv: process.env.NODE_ENV || "development",
   frontendUrl: process.env.FRONTEND_URL || "",
+  // Brevo (e-mail transacional) — usado no "esqueci minha senha".
+  // apiUrl aponta para o endpoint oficial de envio; pode ser trocado por
+  // BREVO_API_URL sem alterar o código.
+  brevo: {
+    apiKey: secret("BREVO_API_KEY"),
+    fromEmail: String(process.env.BREVO_FROM_EMAIL || "").trim(),
+    fromName: process.env.BREVO_FROM_NAME || "Bolão",
+    apiUrl: process.env.BREVO_API_URL || "https://api.brevo.com/v3/smtp/email",
+    timeoutMs: num("BREVO_TIMEOUT_MS", 10000),
+  },
   // Dominio(s) permitido(s) pelo CORS.
   // - Se FRONTEND_URL for definido, usa só essas origens (separadas por vírgula).
   // - Se não for definido e o ambiente for produção, aceita qualquer origem (*).

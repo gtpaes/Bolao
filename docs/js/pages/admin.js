@@ -13,21 +13,24 @@ import { currentRole } from "../api/auth.js";
 export async function adminDashboard(view) {
   await loadTemplate(view, "admin/dashboard.html");
   await run(view, async () => {
+    let overview = { users: 0, rounds: 0, tickets: 0, revenueCents: 0 };
+    try { overview = await request("/admin/overview"); } catch (e) { toastError("Dashboard indisponível", e.message); }
     const stats = [
-      { ico: "users", label: "Usuários", value: "—" },
-      { ico: "calendar-clock", label: "Rodadas", value: "—" },
-      { ico: "ticket", label: "Tickets", value: "—" },
-      { ico: "circle-dollar-sign", label: "Receitas", value: "—" },
+      { ico: "users", label: "Usuários", value: String(overview.users || 0) },
+      { ico: "calendar-clock", label: "Rodadas", value: String(overview.rounds || 0) },
+      { ico: "ticket", label: "Tickets pagos", value: String(overview.tickets || 0) },
+      { ico: "circle-dollar-sign", label: "Receitas", value: brl((overview.revenueCents || 0) / 100) },
     ];
     view.querySelector("#admin-stats").replaceChildren(...stats.map(statCard));
 
     const curHost = view.querySelector('[data-host="current-round"]');
     let round = null;
-    try { round = (await getCurrentRound()).round; } catch (e) { round = null; }
+    round = overview.currentRound || null;
     if (round) {
       curHost.innerHTML = `
         <div class="li"><span class="li-key">Rodada</span><span class="li-val">${esc(String(round.number))}</span></div>
-        <div class="li"><span class="li-key">Status</span><span class="li-val">${esc(String(round.status || "—"))}</span></div>`;
+        <div class="li"><span class="li-key">Status</span><span class="li-val">${esc(String(round.status || "—"))}</span></div>
+        <div class="li"><span class="li-key">Fechamento</span><span class="li-val">${esc(dateShort(round.deadline))}</span></div>`;
     } else {
       curHost.replaceChildren(stateNode("empty", { title: "Sem rodada aberta", message: "Crie ou abra uma rodada para começar." }));
     }
@@ -61,12 +64,24 @@ export async function adminRound(view) {
         </div>
       </div>`;
 
-    view.querySelector("#r-save").addEventListener("click", () => toastSuccess("Salvo", "Configuração da rodada salva nesta sessão."));
-    view.querySelector("#r-close").addEventListener("click", () => toastInfo("Fechamento", "A rodada foi marcada como fechada nesta sessão."));
-    view.querySelector("#r-reopen").addEventListener("click", () => toastInfo("Reabertura", "A rodada foi marcada como aberta nesta sessão."));
+    const roundId = current && current.id;
+    view.querySelector("#r-save").addEventListener("click", async () => {
+      if (!roundId) return toastError("Rodada não encontrada", "Sincronize uma rodada primeiro.");
+      try {
+        const deadline = view.querySelector("#r-close-at").value;
+        await request(`/admin/rounds/${roundId}/deadline`, { method: "PATCH", body: { deadline } });
+        toastSuccess("Salvo", "Deadline atualizado.");
+      } catch (e) { toastError("Não foi possível salvar", e.message); }
+    });
+    view.querySelector("#r-close").addEventListener("click", async () => {
+      try { await request(`/admin/rounds/${roundId}/close`, { method: "POST" }); toastSuccess("Rodada fechada", "Novos palpites foram bloqueados."); }
+      catch (e) { toastError("Não foi possível fechar", e.message); }
+    });
+    view.querySelector("#r-reopen").addEventListener("click", async () => {
+      try { await request(`/admin/rounds/${roundId}/reopen`, { method: "POST" }); toastSuccess("Rodada reaberta", "Palpites liberados novamente."); }
+      catch (e) { toastError("Não foi possível reabrir", e.message); }
+    });
 
-    const facts = view.querySelector('[data-host="round-facts"]');
-    facts.replaceChildren(stateNode("off", { title: "Dados da rodada", message: "Sem dados no momento." }));
   });
 }
 /* ---------------- Gerenciar Jogos ---------------- */
@@ -133,11 +148,18 @@ export async function adminMatches(view) {
         <div class="field"><label for="m-away">Equipe visitante</label><input class="input" id="m-away" /></div>
         <div class="field"><label for="m-date">Data e hora</label><input class="input" id="m-date" type="datetime-local" /></div>
         <p class="t-muted t-small">Os jogos salvos aparecem na lista da rodada.</p>`;
-      openModal({
+      const modal = openModal({
         title: "Adicionar jogo",
         body,
         footer: `<button class="btn btn-primary" data-add>Salvar</button>`,
-      }).overlay.querySelector("[data-add]").addEventListener("click", () => toastSuccess("Jogo salvo", "O jogo foi adicionado nesta sessão."));
+      });
+      modal.overlay.querySelector("[data-add]").addEventListener("click", async () => {
+        try {
+          await request(`/admin/rounds/${round.id}/matches`, { method: "POST", body: { home: modal.overlay.querySelector("#m-home").value, away: modal.overlay.querySelector("#m-away").value, startsAt: modal.overlay.querySelector("#m-date").value || null } });
+          modal.overlay.remove();
+          toastSuccess("Jogo salvo", "O jogo manual foi adicionado à rodada.");
+        } catch (e) { toastError("Não foi possível adicionar", e.message); }
+      });
     });
   });
 }
@@ -211,7 +233,12 @@ export async function adminTickets(view) {
   await loadTemplate(view, "admin/tickets.html");
   await run(view, async () => {
     const body = view.querySelector("#admin-tickets-body");
-    body.innerHTML = `<tr><td colspan="5">${emptyRowCell("Nenhum ticket encontrado.")}</td></tr>`;
+    try {
+      const data = await request("/admin/tickets");
+      const tickets = data.tickets || [];
+      if (!tickets.length) { body.innerHTML = `<tr><td colspan="5">${emptyRowCell("Nenhum ticket encontrado.")}</td></tr>`; return; }
+      body.innerHTML = tickets.map((ticket) => `<tr><td>Ticket ${esc(String(ticket.number))}</td><td>${esc(ticket.user)}</td><td>${esc(String(ticket.round || "—"))}</td><td>${esc(ticket.status)}</td><td>${esc(String(ticket.points || 0))}</td></tr>`).join("");
+    } catch (e) { body.innerHTML = `<tr><td colspan="5">${emptyRowCell(e.message || "Não foi possível carregar os tickets.")}</td></tr>`; }
   });
 }
 
@@ -219,7 +246,23 @@ export async function adminTickets(view) {
 export async function adminSettings(view) {
   await loadTemplate(view, "admin/settings.html");
   await run(view, async () => {
-    view.querySelector("#cfg-save").addEventListener("click", () => toastSuccess("Configuração", "Configurações salvas nesta sessão."));
+    try {
+      const data = await request("/admin/settings");
+      const settings = data.settings || {};
+      const points = settings.points || {};
+      view.querySelector("#cfg-exact").value = points.exact ?? 10;
+      view.querySelector("#cfg-draw").value = points.draw ?? 6;
+      view.querySelector("#cfg-winner").value = points.winner ?? 4;
+      view.querySelector("#cfg-miss").value = points.miss ?? 0;
+      view.querySelector("#cfg-price").value = ((settings.priceCents ?? 1000) / 100).toFixed(2);
+      view.querySelector("#cfg-auto-close").checked = settings.autoClose !== false;
+    } catch (e) { toastError("Não foi possível carregar", e.message); }
+    view.querySelector("#cfg-save").addEventListener("click", async () => {
+      try {
+        await request("/admin/settings", { method: "PATCH", body: { priceCents: Math.round(Number(view.querySelector("#cfg-price").value) * 100), autoClose: view.querySelector("#cfg-auto-close").checked, points: { exact: Number(view.querySelector("#cfg-exact").value), draw: Number(view.querySelector("#cfg-draw").value), winner: Number(view.querySelector("#cfg-winner").value), miss: Number(view.querySelector("#cfg-miss").value) } } });
+        toastSuccess("Configuração salva", "As regras foram aplicadas às rodadas abertas.");
+      } catch (e) { toastError("Não foi possível salvar", e.message); }
+    });
   });
 }
 

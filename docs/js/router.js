@@ -24,13 +24,6 @@ const ROUTES = [
   { path: "admin/users", title: "Gerenciar Usuários", role: ["admin", "dev"] },
   { path: "admin/tickets", title: "Gerenciar Tickets", role: ["admin", "dev"] },
   { path: "admin/settings", title: "Configurações", role: ["admin", "dev"] },
-  { path: "admin/logs", title: "Logs Admin", role: ["admin", "dev"] },
-  // Dev
-  { path: "dev", title: "Dashboard Dev", role: ["dev"] },
-  { path: "dev/monitoring", title: "Monitoramento", role: ["dev"] },
-  { path: "dev/integrations", title: "API/Integrações", role: ["dev"] },
-  { path: "dev/logs", title: "Logs do Sistema", role: ["dev"] },
-  { path: "dev/diagnostics", title: "Diagnóstico", role: ["dev"] },
 ];
 
 export async function initRouter() {

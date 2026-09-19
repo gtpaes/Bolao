@@ -2,6 +2,7 @@
 import { initTheme } from "./theme.js";
 import { isEmail } from "../utils/format.js";
 import { toastError, toastSuccess, toastInfo } from "../components/toast.js";
+import { request } from "./api/client.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
@@ -20,11 +21,17 @@ async function onSubmit(e) {
     return;
   }
 
-  // O envio do link é feito por e-mail.
   btn.disabled = true;
   btn.innerHTML = `<span class="spinner in-btn"></span> Enviando…`;
-  toastSuccess("Solicitação registrada", "Se o e-mail existir, você receberá um link seguro.");
-  setTimeout(() => { window.location.replace("login.html"); }, 1200);
+  try {
+    await request("/auth/recover", { method: "POST", body: { email } });
+    toastSuccess("Solicitação registrada", "Se o e-mail existir, você receberá um link seguro.");
+    btn.innerHTML = "Link solicitado";
+  } catch (error) {
+    toastError("Não foi possível solicitar", error.message || "Tente novamente.");
+    btn.disabled = false;
+    btn.textContent = "Enviar link de recuperação";
+  }
 }
 
 function showErr(field, msg) {

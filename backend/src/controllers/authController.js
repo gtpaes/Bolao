@@ -19,4 +19,14 @@ async function login(req, res, next) {
   } catch (e) { return next(e); }
 }
 
-module.exports = { register, login };
+async function requestReset(req, res, next) {
+  try { await authService.requestPasswordReset(req.body && req.body.email); return res.json({ ok: true }); }
+  catch (e) { return next(e); }
+}
+
+async function resetPassword(req, res, next) {
+  try { await authService.resetPassword(req.body && req.body.token, req.body && req.body.password); return res.json({ ok: true }); }
+  catch (e) { return next(e); }
+}
+
+module.exports = { register, login, requestReset, resetPassword };

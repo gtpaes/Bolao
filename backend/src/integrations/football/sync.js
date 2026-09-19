@@ -143,6 +143,8 @@ async function syncRound(forceNumber) {
       ? enabledByExternalId.get(Number(match.externalId))
       : true;
   }
+  const manualMatches = (existing && existing.matches || []).filter((match) => match.isManual);
+  const mergedItems = [...items, ...manualMatches.filter((manual) => !items.some((item) => Number(item.externalId) === Number(manual.externalId)))];
   const prevDeadline = existing ? existing.deadline : null;
   const prevStatus = existing ? existing.status : null;
   const finishedCount = items.filter((m) => m.status === "finished").length;
@@ -151,7 +153,7 @@ async function syncRound(forceNumber) {
 
   const doc = await Round.findOneAndUpdate(
     { number: Number(target.rodada) },
-    { $set: { name: target.nome || `${target.rodada}ª Rodada`, slug: target.slug || "", providerStatus: target.status || "", status: prevStatus === "closed" ? "closed" : autoStatus, deadline: prevDeadline, matches: items, source: "api-futebol", syncedAt: new Date() } },
+    { $set: { name: target.nome || `${target.rodada}ª Rodada`, slug: target.slug || "", providerStatus: target.status || "", status: prevStatus === "closed" ? "closed" : autoStatus, deadline: prevDeadline, matches: mergedItems, source: "api-futebol", syncedAt: new Date() } },
     { upsert: true, new: true }
   );
 

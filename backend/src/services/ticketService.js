@@ -1,9 +1,7 @@
 const Ticket = require("../models/Ticket");
 const Round = require("../models/Round");
-const Payment = require("../models/Payment");
 const Pick = require("../models/Pick");
 const { badRequest, forbidden, notFound, paymentRequired } = require("../utils/errors");
-const { newIdempotencyKey } = require("../utils/idempotency");
 
 const UNIT_PRICE_CENTS = 1000;
 
@@ -24,17 +22,12 @@ function toTicketDTO(t, round) {
     picks_count: (o.picks || []).length,
     points: o.points || 0,
     acquired_at: o.createdAt,
+    payment_id: o.paymentId ? String(o.paymentId) : null,
   };
 }
 
-async function currentOpenRoundOrThrow() {
-  const round = await Round.findOne({ status: "open" }).sort({ number: -1 });
-  if (!round) throw badRequest("Nenhuma rodada aberta no momento.");
-  return round;
-}
-
 async function listMyTickets(userId) {
-  const tickets = await Ticket.find({ userId }).sort({ createdAt: -1 }).lean();
+  const tickets = await Ticket.find({ userId, status: { $in: ["released", "closed", "scored"] } }).sort({ createdAt: -1 }).lean();
   const roundIds = [...new Set(tickets.map((t) => String(t.roundId)))];
   const rounds = await Round.find({ _id: { $in: roundIds } }).lean();
   const byId = new Map(rounds.map((r) => [String(r._id), r]));
@@ -52,42 +45,8 @@ async function getMyTicket(userId, ticketId) {
 
 // Cria N tickets (1 doc por ticket) + 1 cobrança pendente. Valor recalculado no servidor.
 async function buyTickets(userId, quantity) {
-  const qty = Math.floor(Number(quantity));
-  if (!Number.isFinite(qty) || qty < 1 || qty > 100) throw badRequest("Quantidade inválida.");
-  const round = await currentOpenRoundOrThrow();
-  const totalCents = qty * UNIT_PRICE_CENTS;
-
-  const last = await Ticket.find({ userId, roundId: round._id }).sort({ number: -1 }).limit(1).lean();
-  const startNumber = last.length ? last[0].number + 1 : 1;
-
-  const docs = [];
-  for (let i = 0; i < qty; i += 1) {
-    docs.push({
-      userId,
-      roundId: round._id,
-      number: startNumber + i,
-      unitPriceCents: UNIT_PRICE_CENTS,
-      status: "waiting_payment",
-      picks: [],
-      points: 0,
-    });
-  }
-  const created = await Ticket.insertMany(docs, { ordered: true });
-  const payment = await Payment.create({
-    userId,
-    ticketIds: created.map((t) => t._id),
-    amountCents: totalCents,
-    status: "pending",
-    idempotencyKey: newIdempotencyKey("tickets"),
-    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-  });
-  for (const t of created) {
-    await Ticket.updateOne({ _id: t._id }, { $set: { paymentId: payment._id } });
-  }
-  return {
-    tickets: created.map((t) => toTicketDTO(t.toObject ? t.toObject() : t, round.toObject ? round.toObject() : round)),
-    payment: { id: String(payment._id), amountCents: totalCents, status: payment.status },
-  };
+  const { createPayment } = require("./paymentService");
+  return { payment: await createPayment(userId, quantity) };
 }
 
 // Salva palpites com trava real de fechamento (deadline + status + jogo iniciado).
@@ -136,16 +95,20 @@ async function savePicks(userId, ticketId, picks) {
   return toTicketDTO(ticket.toObject(), round.toObject());
 }
 
-async function listPublicPicks(roundId) {
+async function listPublicPicks(roundId, ticketId) {
   const round = roundId
     ? await Round.findById(roundId).lean()
     : await Round.findOne({}).sort({ number: -1 }).lean();
-  if (!round) return { round: null, tickets: [] };
+  if (!round) return { round: null, tickets: [], visible: false };
+  if (round.status === "open") {
+    return { round: { id: String(round._id), number: round.number, name: round.name || "" }, tickets: [], visible: false };
+  }
 
   const tickets = await Ticket.find({
     roundId: round._id,
     status: { $in: ["released", "closed", "scored"] },
     "picks.0": { $exists: true },
+    ...(ticketId ? { _id: ticketId } : {}),
   }).populate("userId", "username").sort({ number: 1 }).lean();
   const persisted = await Pick.find({ roundId: round._id }).sort({ ticketId: 1, matchExternalId: 1 }).lean();
   const matchesById = new Map((round.matches || []).map((match) => [Number(match.externalId), match]));

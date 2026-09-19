@@ -22,6 +22,7 @@ const matchSchema = new Schema(
     awayScore: { type: Number, default: null },
     penalty: { type: Boolean, default: false },
     stadium: { type: String, default: "" },
+    isManual: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -37,6 +38,12 @@ const roundSchema = new Schema(
     // Janela estendida para jogos adiados movidos para esta rodada
     extendedDeadline: { type: Date, default: null },
     extendedMatchIds: [{ type: Number }],
+    scoringRules: {
+      exact: { type: Number, min: 0, default: 10 },
+      draw: { type: Number, min: 0, default: 6 },
+      winner: { type: Number, min: 0, default: 4 },
+      miss: { type: Number, min: 0, default: 0 },
+    },
     matches: { type: [matchSchema], default: [] },
     source: { type: String, default: "api-futebol" },
     syncedAt: { type: Date, default: null },

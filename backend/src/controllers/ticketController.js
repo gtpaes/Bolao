@@ -1,4 +1,5 @@
 const ticketService = require("../services/ticketService");
+const paymentService = require("../services/paymentService");
 const { badRequest } = require("../utils/errors");
 
 async function list(req, res, next) {
@@ -7,7 +8,7 @@ async function list(req, res, next) {
 }
 
 async function publicPicks(req, res, next) {
-  try { return res.json(await ticketService.listPublicPicks(req.query.round)); }
+  try { return res.json(await ticketService.listPublicPicks(req.query.round, req.query.ticket)); }
   catch (e) { return next(e); }
 }
 async function get(req, res, next) {
@@ -18,8 +19,8 @@ async function buy(req, res, next) {
   try {
     const { quantity } = req.body || {};
     if (quantity == null) throw badRequest("Informe a quantidade.");
-    const data = await ticketService.buyTickets(req.user.id, quantity);
-    return res.status(201).json({ ok: true, ...data });
+    const data = await paymentService.createPayment(req.user.id, quantity);
+    return res.status(201).json({ ok: true, payment: data });
   } catch (e) { return next(e); }
 }
 async function picks(req, res, next) {

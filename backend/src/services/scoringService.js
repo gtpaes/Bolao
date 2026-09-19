@@ -26,7 +26,7 @@ async function processRoundScoring(roundId) {
         );
         continue;
       }
-      const points = scorePick(Number(pick.home), Number(pick.away), Number(match.homeScore), Number(match.awayScore));
+      const points = scorePick(Number(pick.home), Number(pick.away), Number(match.homeScore), Number(match.awayScore), round.scoringRules || POINTS);
       pick.points = points;
       await ScoreLog.create({
         roundId: round._id,
@@ -50,7 +50,7 @@ async function processRoundScoring(roundId) {
     }
   }
   logger.info({ round: round.number, processed }, "pontuação processada");
-  return { processed, rules: POINTS };
+  return { processed, rules: round.scoringRules || POINTS };
 }
 
 async function getRanking(roundId) {
@@ -65,16 +65,17 @@ async function getRanking(roundId) {
   const tickets = await Ticket.find({ roundId: round._id, status: { $in: ["released", "closed", "scored"] } })
     .populate("userId", "username")
     .lean();
-  const byUser = new Map();
-  for (const t of tickets) {
-    const uid = String(t.userId && t.userId._id ? t.userId._id : t.userId);
-    const name = (t.userId && t.userId.username) || "Usuário";
-    const cur = byUser.get(uid) || { user_id: uid, username: name, points: 0, tickets: 0 };
-    cur.points += Number(t.points) || 0;
-    cur.tickets += 1;
-    byUser.set(uid, cur);
-  }
-  const ranking = [...byUser.values()].sort((a, b) => b.points - a.points || a.username.localeCompare(b.username));
+  const ranking = tickets
+    .filter((ticket) => Array.isArray(ticket.picks) && ticket.picks.length > 0)
+    .map((t) => ({
+      ticket_id: String(t._id),
+      ticket_number: t.number,
+      user_id: String(t.userId && t.userId._id ? t.userId._id : t.userId),
+      username: (t.userId && t.userId.username) || "Usuário",
+      points: Number(t.points) || 0,
+    }))
+    .sort((a, b) => b.points - a.points || a.username.localeCompare(b.username) || a.ticket_number - b.ticket_number)
+    .map((entry, index) => ({ ...entry, position: index + 1 }));
   return { ranking, myPosition: null, roundId: String(round._id) };
 }
 

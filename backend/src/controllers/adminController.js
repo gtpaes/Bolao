@@ -2,6 +2,7 @@ const Round = require("../models/Round");
 const Ticket = require("../models/Ticket");
 const User = require("../models/User");
 const Payment = require("../models/Payment");
+const Settings = require("../models/Settings");
 const { syncRound } = require("../integrations/football/sync");
 const { processRoundScoring } = require("../services/scoringService");
 const { badRequest, notFound } = require("../utils/errors");
@@ -11,7 +12,7 @@ async function overview(req, res, next) {
     const [users, rounds, tickets, revenue] = await Promise.all([
       User.countDocuments(),
       Round.countDocuments(),
-      Ticket.countDocuments(),
+      Ticket.countDocuments({ status: { $in: ["released", "closed", "scored"] } }),
       Payment.aggregate([{ $match: { status: "approved" } }, { $group: { _id: null, total: { $sum: "$amountCents" } } }]),
     ]);
     const current = await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
@@ -86,6 +87,21 @@ async function setRoundMatches(req, res, next) {
   } catch (e) { return next(e); }
 }
 
+async function addMatch(req, res, next) {
+  try {
+    const { home, away, startsAt } = req.body || {};
+    if (!String(home || "").trim() || !String(away || "").trim()) throw badRequest("Informe os dois times.");
+    const round = await Round.findById(req.params.id);
+    if (!round) throw notFound("Rodada não encontrada.");
+    const date = startsAt ? new Date(startsAt) : null;
+    if (startsAt && Number.isNaN(date.getTime())) throw badRequest("Data do jogo inválida.");
+    const externalId = -Date.now();
+    round.matches.push({ externalId, home: String(home).trim(), away: String(away).trim(), startsAt: date, enabledForTickets: true, isManual: true, status: "scheduled" });
+    await round.save();
+    return res.status(201).json({ ok: true, match: { id: String(externalId), externalId, home: String(home).trim(), away: String(away).trim(), date, enabled_for_tickets: true } });
+  } catch (e) { return next(e); }
+}
+
 async function listUsers(req, res, next) {
   try {
     const users = await User.find({}).sort({ createdAt: -1 }).limit(200).lean();
@@ -95,12 +111,13 @@ async function listUsers(req, res, next) {
 
 async function listTickets(req, res, next) {
   try {
-    const tickets = await Ticket.find({}).sort({ createdAt: -1 }).limit(200).populate("userId", "username").lean();
+    const tickets = await Ticket.find({}).sort({ createdAt: -1 }).limit(200).populate("userId", "username").populate("roundId", "number").lean();
     return res.json({
       tickets: tickets.map((t) => ({
         id: String(t._id),
         number: t.number,
         user: t.userId && t.userId.username ? t.userId.username : "—",
+        round: t.roundId && t.roundId.number,
         status: t.status,
         points: t.points || 0,
         createdAt: t.createdAt,
@@ -123,4 +140,19 @@ async function setUserRole(req, res, next) {
   } catch (e) { return next(e); }
 }
 
-module.exports = { overview, setDeadline, closeRound, reopenRound, syncNow, setRoundMatches, listUsers, listTickets, setUserRole };
+async function getSettings(req, res, next) {
+  try { const settings = await Settings.findOneAndUpdate({ key: "default" }, { $setOnInsert: { key: "default" } }, { upsert: true, new: true }).lean(); return res.json({ settings }); }
+  catch (e) { return next(e); }
+}
+
+async function updateSettings(req, res, next) {
+  try {
+    const body = req.body || {};
+    const points = body.points || {};
+    const settings = await Settings.findOneAndUpdate({ key: "default" }, { $set: { priceCents: Math.max(1, Math.floor(Number(body.priceCents || 1000))), autoClose: body.autoClose !== false, points: { exact: Math.max(0, Number(points.exact ?? 10)), draw: Math.max(0, Number(points.draw ?? 6)), winner: Math.max(0, Number(points.winner ?? 4)), miss: Math.max(0, Number(points.miss ?? 0)) } } }, { upsert: true, new: true });
+    await Round.updateMany({ status: "open" }, { $set: { scoringRules: settings.points } });
+    return res.json({ ok: true, settings });
+  } catch (e) { return next(e); }
+}
+
+module.exports = { overview, setDeadline, closeRound, reopenRound, syncNow, setRoundMatches, addMatch, listUsers, listTickets, setUserRole, getSettings, updateSettings };

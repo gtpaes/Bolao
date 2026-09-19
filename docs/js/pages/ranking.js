@@ -27,13 +27,18 @@ export async function render(view) {
     }
     body.innerHTML = data.ranking.map((r, i) => {
       const me = profile.id && r.user_id === profile.id;
-      return `<tr class="${me ? "row-me" : ""}">
+      return `<tr class="${me ? "row-me" : ""} ranking-link" data-ticket="${esc(r.ticket_id)}" tabindex="0" role="link">
         <td><span class="pos-pill ${posClass(i + 1, me)}">${i + 1}</span></td>
         <td class="row"><span class="avatar avatar-sm">${esc(initials(r.username))}</span> ${me ? `<span class="t-bold">${esc(r.username)} (você)</span>` : esc(r.username)}</td>
+        <td>Ticket ${esc(String(r.ticket_number))}</td>
         <td><span class="num">${esc(String(r.points ?? 0))}</span></td>
-        <td><span class="num">${esc(String(r.tickets ?? 0))}</span></td>
       </tr>`;
     }).join("");
+    body.querySelectorAll("[data-ticket]").forEach((row) => {
+      const open = () => { window.location.hash = `#/bets/${encodeURIComponent(row.dataset.ticket)}`; };
+      row.addEventListener("click", open);
+      row.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } });
+    });
     if (typeof window.lucide !== "undefined") window.lucide.createIcons();
   });
 }
