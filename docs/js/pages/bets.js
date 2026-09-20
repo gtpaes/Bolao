@@ -42,6 +42,8 @@ export async function render(view) {
 function ticketCard(ticket) {
   const card = document.createElement("div");
   card.className = "card";
+  const picks = ticket.picks || [];
+  const scored = Number.isInteger(ticket.scored_count) ? ticket.scored_count : picks.filter((pick) => pick.finished === true).length;
   card.innerHTML = `
     <div class="card-header">
       <div class="row"><span class="avatar avatar-sm">${esc(initials(ticket.username))}</span><h2 class="card-title">${esc(ticket.username)}</h2></div>
@@ -49,16 +51,37 @@ function ticketCard(ticket) {
     </div>
     <div class="card-body">
       <div class="public-pick-list">
-        ${(ticket.picks || []).map((pick) => `
-          <div class="public-pick-row">
-            <span>${esc(pick.home_team || "Mandante")} x ${esc(pick.away_team || "Visitante")}</span>
-            <strong>${esc(String(pick.home))} x ${esc(String(pick.away))}</strong>
-            ${Number(pick.points) > 0 ? `<span class="badge badge-green">${esc(String(pick.points))} pts</span>` : ""}
-          </div>`).join("")}
+        ${picks.map(pickRow).join("")}
       </div>
     </div>
-    <div class="card-footer"><span class="t-muted">Total: <strong>${esc(String(ticket.points || 0))} pontos</strong></span></div>`;
+    <div class="card-footer"><span class="t-muted">Total: <strong>${esc(String(ticket.points || 0))} pontos</strong> · ${esc(String(scored))} de ${esc(String(picks.length))} jogos com resultado</span></div>`;
   return card;
+}
+
+// Cada linha responde às três perguntas do jogador: qual era o jogo, o que ele
+// apostou, qual foi o resultado e quanto rendeu. Quem não pontuou aparece como
+// "0 pts" em vermelho — antes o selo simplesmente sumia e o jogo parecia não
+// ter sido computado.
+function pickRow(pick) {
+  const points = Number(pick.points) || 0;
+  const finished = pick.finished === true;
+  const result = finished
+    ? `<strong>${esc(String(pick.home_score))} x ${esc(String(pick.away_score))}</strong>`
+    : '<strong>—</strong>';
+  const badge = finished
+    ? (points > 0
+      ? `<span class="badge badge-green">${esc(String(points))} pts</span>`
+      : '<span class="badge badge-red">0 pts</span>')
+    : (pick.match_status === "live"
+      ? '<span class="badge badge-amber">ao vivo</span>'
+      : '<span class="badge badge-gray">aguardando</span>');
+  return `
+    <div class="public-pick-row rich">
+      <span class="pp-match">${esc(pick.home_team || "Mandante")} x ${esc(pick.away_team || "Visitante")}</span>
+      <span class="pp-field"><span class="pp-label">Palpite</span><strong>${esc(String(pick.home))} x ${esc(String(pick.away))}</strong></span>
+      <span class="pp-field${finished ? "" : " t-muted"}"><span class="pp-label">Resultado</span>${result}</span>
+      ${badge}
+    </div>`;
 }
 
 function initials(name) {

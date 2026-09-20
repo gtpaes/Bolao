@@ -73,6 +73,16 @@
 .public-pick-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 9px 0; border-bottom: 1px solid var(--border); color: var(--muted); font-size: .88rem; }
 .public-pick-row:last-child { border-bottom: none; }
 .public-pick-row strong { color: var(--ink); font-family: var(--font-mono); }
+/* Linha completa: jogo, palpite, resultado e pontos (Apostas da Rodada) */
+.public-pick-row.rich { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) auto; align-items: center; }
+.public-pick-row.rich .pp-match { color: var(--ink); font-weight: 600; }
+.public-pick-row.rich .pp-field { display: flex; flex-direction: column; line-height: 1.35; }
+.public-pick-row.rich .pp-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted-2); }
+.public-pick-row.rich .badge { justify-self: end; white-space: nowrap; }
+@media (max-width: 640px) {
+  .public-pick-row.rich { grid-template-columns: 1fr auto; row-gap: var(--space-2); }
+  .public-pick-row.rich .pp-match { grid-column: 1 / -1; }
+}
 .ranking-link { cursor: pointer; }
 .ranking-link:hover { background: var(--surface-2); }
 

@@ -18,9 +18,11 @@ const footballBaseUrl = process.env.FOOTBALL_API_BASE_URL || (
   footballProvider === "football-data" ? "https://api.football-data.org/v4" : "https://api.api-futebol.com.br/v1"
 );
 
+const _nodeEnv = process.env.NODE_ENV || "development";
+
 const config = {
   port: num("PORT", 3001),
-  nodeEnv: process.env.NODE_ENV || "development",
+  nodeEnv: _nodeEnv,
   frontendUrl: process.env.FRONTEND_URL || "",
   // Brevo (e-mail transacional) — usado no "esqueci minha senha".
   // apiUrl aponta para o endpoint oficial de envio; pode ser trocado por

@@ -43,6 +43,36 @@ export async function render(view) {
 function historyCard(item) {
   const card = document.createElement("div");
   card.className = "card";
-  card.innerHTML = `<div class="card-header"><h2 class="card-title">Rodada ${esc(String(item.round_number || "—"))} · Ticket ${esc(String(item.ticket_number))}</h2><span class="badge badge-green">${esc(String(item.points))} pontos</span></div><div class="card-body"><p class="t-muted">${esc(String(item.status))} · ${esc(dateShort(item.created_at))}</p><div class="public-pick-list">${(item.picks || []).map((pick) => `<div class="public-pick-row"><span>${esc(pick.home_team)} x ${esc(pick.away_team)}</span><strong>${esc(String(pick.predicted.home))} x ${esc(String(pick.predicted.away))}${pick.actual ? ` · resultado ${esc(String(pick.actual.home))} x ${esc(String(pick.actual.away))}` : ""}</strong><span class="badge badge-gray">${esc(String(pick.points))} pts</span></div>`).join("")}</div></div>`;
+  const total = Number(item.points) || 0;
+  card.innerHTML = `
+    <div class="card-header">
+      <h2 class="card-title">Rodada ${esc(String(item.round_number || "—"))} · Ticket ${esc(String(item.ticket_number))}</h2>
+      <span class="badge ${total > 0 ? "badge-green" : "badge-gray"}">${esc(String(total))} pontos</span>
+    </div>
+    <div class="card-body">
+      <p class="t-muted">${esc(String(item.status))} · ${esc(dateShort(item.created_at))}</p>
+      <div class="public-pick-list">${(item.picks || []).map(pickRow).join("")}</div>
+    </div>`;
   return card;
+}
+
+// Cada palpite mostra o que foi apostado, o resultado real e os pontos. Jogo sem
+// resultado ainda aparece como "aguardando" (o 0 ainda pode mudar) e o palpite
+// que rendeu 0 ponto fica em vermelho, em vez de um selo cinza sem significado.
+function pickRow(pick) {
+  const points = Number(pick.points) || 0;
+  const hasResult = Boolean(pick.actual);
+  const predicted = pick.predicted ? `${pick.predicted.home} x ${pick.predicted.away}` : "—";
+  const actual = hasResult ? ` · resultado ${pick.actual.home} x ${pick.actual.away}` : "";
+  const badge = !hasResult
+    ? '<span class="badge badge-gray">aguardando</span>'
+    : (points > 0
+      ? `<span class="badge badge-green">${esc(String(points))} pts</span>`
+      : '<span class="badge badge-red">0 pts</span>');
+  return `
+    <div class="public-pick-row">
+      <span>${esc(pick.home_team)} x ${esc(pick.away_team)}</span>
+      <strong>${esc(predicted)}${esc(actual)}</strong>
+      ${badge}
+    </div>`;
 }

@@ -12,7 +12,7 @@ async function processRoundScoring(roundId) {
   if (!round) return { processed: 0 };
   const finished = (round.matches || []).filter((m) => m.status === "finished" && m.homeScore != null && m.awayScore != null);
   if (!finished.length) return { processed: 0 };
-  // Regras globais (Configurações) — a mesma pontuação vale para todas as rodadas.
+  // Regras globais (Configurações) — a mesma pontuação vale para todas de rodadas.
   const rules = await getScoringRules();
   const tickets = await Ticket.find({ roundId: round._id, status: { $in: ["released", "closed", "scored"] } });
   let processed = 0;
@@ -56,6 +56,20 @@ async function processRoundScoring(roundId) {
   return { processed, rules };
 }
 
+// Varre todas as rodadas e recalcula a pontuação de jogos já finalizados.
+// Corrige o bug em que rodadas antigas ficavam sem pontuação quando a rodada
+// atual avançava (pickTargetRound ignora rodadas já finalizadas).
+async function scoreFinishedRounds() {
+  const rounds = await Round.find({ "matches.status": "finished" }).lean();
+  let totalProcessed = 0;
+  for (const round of rounds) {
+    const result = await processRoundScoring(round._id);
+    totalProcessed += result.processed || 0;
+  }
+  logger.info({ rounds: rounds.length, processed: totalProcessed }, "pontuação de rodadas finalizadas");
+  return { rounds: rounds.length, processed: totalProcessed };
+}
+
 async function getRanking(roundId) {
   let round = null;
   if (roundId) {
@@ -82,4 +96,4 @@ async function getRanking(roundId) {
   return { ranking, myPosition: null, roundId: String(round._id) };
 }
 
-module.exports = { processRoundScoring, getRanking, POINTS };
+module.exports = { processRoundScoring, getRanking, POINTS, scoreFinishedRounds };

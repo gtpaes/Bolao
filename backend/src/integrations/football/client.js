@@ -24,19 +24,30 @@ function footballDataMatch(match) {
   const fullTime = match.score && match.score.fullTime || {};
   const halfTime = match.score && match.score.halfTime || {};
   const status = String(match.status || "").toUpperCase();
+  const isFinished = status === "FINISHED";
+  // Para jogos finalizados, usa SEMPRE fullTime (nunca halfTime).
+  // Para jogos ao vivo, usa fullTime quando disponível; senão halfTime.
+  const homeScore = isFinished
+    ? fullTime.home
+    : (fullTime.home ?? halfTime.home ?? null);
+  const awayScore = isFinished
+    ? fullTime.away
+    : (fullTime.away ?? halfTime.away ?? null);
   return {
     partida_id: Number(match.id),
-    campeonato: { campeonato_id: config.football.competitionCode },
+    campeonato: { campeonato_id: Number(config.football.campeonatoId) },
     time_mandante: { nome_popular: match.homeTeam && match.homeTeam.name, escudo: match.homeTeam && match.homeTeam.crest },
     time_visitante: { nome_popular: match.awayTeam && match.awayTeam.name, escudo: match.awayTeam && match.awayTeam.crest },
     data_realizacao_iso: match.utcDate,
     status: status === "LIVE" || status === "IN_PLAY" || status === "PAUSED" ? "andamento" : status === "FINISHED" ? "finalizado" : footballDataStatus(status),
-    placar_mandante: fullTime.home ?? halfTime.home ?? null,
-    placar_visitante: fullTime.away ?? halfTime.away ?? null,
+    placar_mandante: homeScore,
+    placar_visitante: awayScore,
     disputa_penalti: false,
     estadio: { nome_popular: match.venue || "" },
   };
 }
+
+module.exports = { listRounds, getRoundDetail, listLive, footballDataMatch };
 
 function footballDataRoundStatus(matches) {
   const statuses = matches.map((match) => String(match.status || "").toUpperCase());
@@ -128,4 +139,4 @@ async function listLive() {
   return data;
 }
 
-module.exports = { listRounds, getRoundDetail, listLive };
+

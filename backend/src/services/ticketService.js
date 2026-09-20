@@ -100,6 +100,26 @@ async function savePicks(userId, ticketId, picks) {
   return toTicketDTO(ticket.toObject(), round.toObject());
 }
 
+// Um palpite público precisa carregar três coisas: o que o jogador apostou, o
+// resultado real do jogo e os pontos ganhos. Sem o resultado o placar zerado
+// ficava sem contexto (parecia que o jogo não tinha sido computado).
+function toPublicPick(pick, matchesById) {
+  const match = matchesById.get(Number(pick.matchExternalId)) || null;
+  const finished = Boolean(match && match.status === "finished" && match.homeScore != null && match.awayScore != null);
+  return {
+    match_id: pick.matchExternalId,
+    home_team: match ? match.home : "Mandante",
+    away_team: match ? match.away : "Visitante",
+    home: pick.home,
+    away: pick.away,
+    points: Number(pick.points) || 0,
+    match_status: match ? match.status : null,
+    finished,
+    home_score: finished ? Number(match.homeScore) : null,
+    away_score: finished ? Number(match.awayScore) : null,
+  };
+}
+
 async function listPublicPicks(roundId, ticketId) {
   const round = roundId
     ? await Round.findById(roundId).lean()
@@ -132,28 +152,17 @@ async function listPublicPicks(roundId, ticketId) {
   }
   for (const pick of persisted) {
     const entry = byTicket.get(String(pick.ticketId));
-    if (entry) {
-      const match = matchesById.get(Number(pick.matchExternalId));
-      entry.picks.push({
-        match_id: pick.matchExternalId,
-        home_team: match ? match.home : "Mandante",
-        away_team: match ? match.away : "Visitante",
-        home: pick.home,
-        away: pick.away,
-        points: pick.points || 0,
-      });
-    }
+    if (entry) entry.picks.push(toPublicPick(pick, matchesById));
   }
   for (const ticket of tickets) {
     const entry = byTicket.get(String(ticket._id));
-    if (entry && !entry.picks.length) entry.picks = (ticket.picks || []).map((pick) => ({
-      match_id: pick.matchExternalId,
-      home_team: matchesById.get(Number(pick.matchExternalId))?.home || "Mandante",
-      away_team: matchesById.get(Number(pick.matchExternalId))?.away || "Visitante",
-      home: pick.home,
-      away: pick.away,
-      points: pick.points || 0,
-    }));
+    if (entry && !entry.picks.length) {
+      entry.picks = (ticket.picks || []).map((pick) => toPublicPick(pick, matchesById));
+    }
+  }
+  for (const entry of byTicket.values()) {
+    entry.picks_count = entry.picks.length;
+    entry.scored_count = entry.picks.filter((pick) => pick.finished).length;
   }
   return {
     round: { id: String(round._id), number: round.number, name: round.name || "" },

@@ -3,7 +3,7 @@ const config = require("../config/env");
 const logger = require("../config/logger");
 const { syncRound, applyLive } = require("../integrations/football/sync");
 const { listLive } = require("../integrations/football/client");
-const { processRoundScoring } = require("../services/scoringService");
+const { scoreFinishedRounds } = require("../services/scoringService");
 const { autoCloseIfDue, closesAt } = require("./roundLifecycle");
 const Round = require("../models/Round");
 const Settings = require("../models/Settings");
@@ -70,7 +70,7 @@ function startJobs() {
       logger.info(res, "sync rodada");
       if (res && res.round != null) {
         const round = await Round.findOne({ number: res.round });
-        if (round) await processRoundScoring(round._id);
+        if (round) await scoreFinishedRounds();
         // Rede de segurança do fechamento automático: o timer abaixo fecha no
         // instante exato (1º jogo − 2h); isto cobre reinício do processo.
         if (await autoCloseEnabled()) {

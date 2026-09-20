@@ -4,7 +4,7 @@ const User = require("../models/User");
 const Payment = require("../models/Payment");
 const settingsService = require("../services/settingsService");
 const { syncRound } = require("../integrations/football/sync");
-const { processRoundScoring } = require("../services/scoringService");
+const { scoreFinishedRounds } = require("../services/scoringService");
 const { closeRound: closeRoundService, reopenRound: reopenRoundService, setAutomatic, closesAt } = require("../services/roundLifecycle");
 const { badRequest, notFound } = require("../utils/errors");
 
@@ -94,8 +94,7 @@ async function syncNow(req, res, next) {
     const force = req.body && req.body.round != null ? Number(req.body.round) : undefined;
     const result = await syncRound(force);
     if (result && result.round != null) {
-      const round = await Round.findOne({ number: result.round });
-      if (round) await processRoundScoring(round._id);
+      await scoreFinishedRounds();
     }
     return res.json({ ok: true, ...result });
   } catch (e) { return next(e); }
