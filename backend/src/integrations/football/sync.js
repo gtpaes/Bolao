@@ -205,30 +205,104 @@ async function syncRound(forceNumber) {
   return { synced: true, round: doc.number, matches: items.length, finished: finishedCount, latestAt, advancedTo };
 }
 
-// Aplica o placar ao vivo (filtrado pelo campeonato) nos jogos salvos.
+// Aplica o placar ao vivo (filtrado pelo campeonato) nos jogos salvos e, em
+// seguida, reconcilia os jogos que saíram da lista ao vivo (ver
+// reconcilePendingRounds) — antes um jogo encerrado ficava preso em "live" com o
+// placar do meio da partida.
 async function applyLive(liveItems) {
   const mine = (liveItems || []).filter((it) => Number(it && it.campeonato && it.campeonato.campeonato_id) === Number(config.football.campeonatoId));
-  if (!mine.length) return { updated: 0 };
   const byId = new Map(mine.map((it) => [Number(it.partida_id), it]));
-  // Inclui "closed": os placares ao vivo continuam sendo aplicados depois do
-  // fechamento dos palpites (a rodada fecha 2h antes do 1º jogo).
-  const rounds = await Round.find({ status: { $in: ["open", "closed"] }, "matches.status": { $in: ["scheduled", "live"] } }).sort({ number: -1 }).limit(3);
   let updated = 0;
-  for (const r of rounds) {
-    let changed = false;
-    for (const m of r.matches) {
-      const it = byId.get(Number(m.externalId));
-      if (!it) continue;
-      m.status = "live";
-      if (it.placar_mandante != null) m.homeScore = Number(it.placar_mandante);
-      if (it.placar_visitante != null) m.awayScore = Number(it.placar_visitante);
-      m.penalty = Boolean(it.disputa_penalti && it.disputa_penalti !== false);
-      changed = true;
-      updated += 1;
+  if (byId.size) {
+    // Inclui "closed": os placares ao vivo continuam sendo aplicados depois do
+    // fechamento dos palpites (a rodada fecha 2h antes do 1º jogo).
+    const rounds = await Round.find({ status: { $in: ["open", "closed"] }, "matches.status": { $in: ["scheduled", "live"] } }).sort({ number: -1 }).limit(3);
+    for (const r of rounds) {
+      let changed = false;
+      for (const m of r.matches) {
+        const it = byId.get(Number(m.externalId));
+        if (!it) continue;
+        m.status = "live";
+        if (it.placar_mandante != null) m.homeScore = Number(it.placar_mandante);
+        if (it.placar_visitante != null) m.awayScore = Number(it.placar_visitante);
+        m.penalty = Boolean(it.disputa_penalti && it.disputa_penalti !== false);
+        changed = true;
+        updated += 1;
+      }
+      if (changed) { r.syncedAt = new Date(); await r.save(); }
     }
-    if (changed) { r.syncedAt = new Date(); await r.save(); }
   }
-  return { updated };
+  const reconcile = await reconcilePendingRounds();
+  return { updated, reconciled: reconcile.adjusted, finishedRounds: reconcile.finishedRounds };
 }
 
-module.exports = { syncRound, applyLive, pickTargetRound, mapMatch, mapStatus, toDate };
+// Um jogo que está em "live" no banco mas já saiu da lista ao-vivo (porque
+// terminou) e um "scheduled" com horário vencido são DADOS PENDENTES: precisam
+// ser re-buscados na rodada do provedor. O syncRound não cobre isso, porque ele
+// só atualiza a rodada-alvo — quando a API avança para a próxima rodada, a
+// anterior com jogos em andamento ficava congelada (placar do meio do jogo e
+// pontuação nunca computada, já que a pontuação exige status "finished").
+const PENDING_GRACE_MS = 15 * 60 * 1000;
+
+async function reconcilePendingRounds({ limit = 3 } = {}) {
+  const overdueBefore = new Date(Date.now() - PENDING_GRACE_MS);
+  const rounds = await Round.find({
+    status: { $in: ["open", "closed"] },
+    matches: {
+      $elemMatch: {
+        // Jogo manual (criado à mão no admin) não existe no provedor: nunca fica
+        // pendente nem consome cota da API.
+        isManual: { $ne: true },
+        $or: [
+          { status: "live" },
+          { status: "scheduled", startsAt: { $lt: overdueBefore } },
+        ],
+      },
+    },
+  }).sort({ number: -1 }).limit(limit);
+
+  let adjusted = 0;
+  const finishedRounds = [];
+  for (const round of rounds) {
+    let detail = null;
+    try {
+      detail = await getRoundDetail(config.football.campeonatoId, round.number);
+    } catch (e) {
+      logger.warn({ err: String(e && e.message), round: round.number }, "falha ao reconciliar rodada pendente");
+      continue;
+    }
+    const items = extractMatches(detail).map(mapMatch).filter((m) => Number.isFinite(m.externalId));
+    if (!items.length) continue;
+    const byId = new Map(items.map((item) => [Number(item.externalId), item]));
+    let changed = false;
+    for (const match of round.matches) {
+      const item = byId.get(Number(match.externalId));
+      if (!item) continue; // jogo que não existe no provedor não é tocado
+      const dirty = item.status !== match.status
+        || item.homeScore !== match.homeScore
+        || item.awayScore !== match.awayScore;
+      match.status = item.status;
+      match.homeScore = item.homeScore;
+      match.awayScore = item.awayScore;
+      match.penalty = item.penalty;
+      if (item.startsAt) match.startsAt = item.startsAt;
+      if (dirty) { changed = true; adjusted += 1; }
+    }
+    // Todos os jogos do provedor encerraram: a rodada acabou de fato. Só não
+    // mexe em rodada reaberta na mão pelo admin (o controle manual vence).
+    const allFinished = items.every((item) => item.status === "finished");
+    if (allFinished && round.status === "closed" && !round.manualOverride) {
+      round.status = "finished";
+      changed = true;
+      finishedRounds.push(round.number);
+    }
+    if (detail.status) round.providerStatus = String(detail.status);
+    if (changed) { round.syncedAt = new Date(); await round.save(); }
+  }
+  if (adjusted || finishedRounds.length) {
+    logger.info({ rounds: rounds.length, adjusted, finishedRounds }, "rodadas pendentes reconciliadas");
+  }
+  return { rounds: rounds.length, adjusted, finishedRounds };
+}
+
+module.exports = { syncRound, applyLive, reconcilePendingRounds, pickTargetRound, mapMatch, mapStatus, toDate };

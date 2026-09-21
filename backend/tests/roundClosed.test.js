@@ -51,6 +51,20 @@ test("o jogo mais cedo da rodada manda, não o primeiro da lista", () => {
   assert.equal(closesAt(round), early.getTime() - AUTO_CLOSE_WINDOW_MS);
 });
 
+test("jogo desabilitado não define o fechamento", () => {
+  const enabled = new Date("2026-03-01T20:00:00.000Z");
+  const round = {
+    status: "open",
+    deadline: null,
+    matches: [
+      { startsAt: new Date("2026-03-01T18:00:00.000Z"), enabledForTickets: false },
+      { startsAt: enabled, enabledForTickets: true },
+    ],
+  };
+  assert.equal(firstMatchStart(round), enabled.getTime());
+  assert.equal(closesAt(round), enabled.getTime() - AUTO_CLOSE_WINDOW_MS);
+});
+
 test("deadline definido no admin vence a regra automática", () => {
   const deadline = new Date("2026-03-01T10:00:00.000Z");
   const round = { status: "open", deadline, matches: [{ startsAt: new Date("2026-03-01T20:00:00.000Z") }] };

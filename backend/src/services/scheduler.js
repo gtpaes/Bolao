@@ -1,7 +1,7 @@
 const cron = require("node-cron");
 const config = require("../config/env");
 const logger = require("../config/logger");
-const { syncRound, applyLive } = require("../integrations/football/sync");
+const { syncRound, applyLive, reconcilePendingRounds } = require("../integrations/football/sync");
 const { listLive } = require("../integrations/football/client");
 const { scoreFinishedRounds } = require("../services/scoringService");
 const { autoCloseIfDue, closesAt } = require("./roundLifecycle");
@@ -68,9 +68,13 @@ function startJobs() {
     try {
       const res = await syncRound();
       logger.info(res, "sync rodada");
+      // Rodadas anteriores ainda com jogo em andamento/vencido não estão no radar
+      // do syncRound: sem isto elas ficam congeladas e sem pontuação.
+      await reconcilePendingRounds().catch((e) => logger.warn({ err: String(e && e.message) }, "falha ao reconciliar rodadas pendentes"));
+      // Pontua toda rodada com jogo finalizado (idempotente por ScoreLog).
+      await scoreFinishedRounds();
       if (res && res.round != null) {
         const round = await Round.findOne({ number: res.round });
-        if (round) await scoreFinishedRounds();
         // Rede de segurança do fechamento automático: o timer abaixo fecha no
         // instante exato (1º jogo − 2h); isto cobre reinício do processo.
         if (await autoCloseEnabled()) {
@@ -92,29 +96,33 @@ function startJobs() {
   // O intervalo efetivo e de 10 minutos por padrao para preservar a cota diaria.
   let liveTimer = null;
 
-  async function shouldPollLive(round) {
+  // Há algo para monitorar nesta rodada? Jogo ao vivo, prestes a começar (ou
+  // recém-terminado). Dado velho demais (mais que a duração de um jogo) não
+  // justifica polling rápido — quem reconcilia esse resto é o cron de 30 min.
+  function hasRelevantMatch(round) {
     if (!round || !round.matches || !round.matches.length) return false;
 
-    const now = new Date();
-    const nowMs = now.getTime();
-
-    // Se houver algum jogo com status "live", consulta no proximo ciclo longo.
-    if (round.matches.some((m) => m && m.status === "live")) return true;
-
-    // Se houver algum jogo agendado a começar em breve (< 15 min), também deve
-    // monitorar para capturar a transição para "live".
+    const nowMs = Date.now();
     const matchDurationMs = (config.football.matchDurationMinutes || 130) * 60 * 1000;
     const preLiveWindowMs = 15 * 60 * 1000; // 15 minutos antes do início
-    const liveWindowMs = matchDurationMs + 5 * 60 * 1000; // prolonga um pouco após o fim
+    const postLiveWindowMs = matchDurationMs + 5 * 60 * 1000; // prolonga um pouco após o fim
+
+    // Ao vivo sem data divulgada continua sendo motivo para consultar.
+    if (round.matches.some((m) => m && m.status === "live" && !m.startsAt)) return true;
 
     for (const m of round.matches) {
       if (!m || !m.startsAt) continue;
       const startMs = new Date(m.startsAt).getTime();
       if (!Number.isFinite(startMs)) continue;
-      // Jogo terminado há mais de 5 min? ignora
-      if (m.status === "finished" && nowMs > startMs + liveWindowMs) continue;
-      // Jogo com início em até 15 min ou já começou
-      if (startMs - nowMs <= preLiveWindowMs || startMs <= nowMs) return true;
+      if (m.status === "live") {
+        if (nowMs - startMs <= postLiveWindowMs) return true;
+        continue;
+      }
+      // Jogo que deveria ter começado há mais tempo que um jogo inteiro já saiu
+      // do radar do polling curto.
+      if (nowMs > startMs + postLiveWindowMs) continue;
+      // Começa em até 15 min ou já começou: captura a transição para "live".
+      return true;
     }
 
     return false;
@@ -122,7 +130,7 @@ function startJobs() {
 
   async function getNextPollDelay(round) {
     // Se tem algo para monitorar agora, mantém intervalo curto.
-    if (await shouldPollLive(round)) {
+    if (hasRelevantMatch(round)) {
       // Nunca consultar mais frequentemente que o piso configurado (5 min).
       return config.football.livePollSeconds * 1000;
     }
@@ -159,52 +167,38 @@ function startJobs() {
     return 15 * 60 * 1000; // 15 minutos sem jogos relevantes
   }
 
-  async function livePollLoop() {
-    // Retorna a rodada se houver jogos relevantes, ou null caso contrário.
-    // Inclui "closed": depois do fechamento (2h antes do 1º jogo) os placares ao
-    // vivo continuam sendo atualizados — só os palpites param.
-    const round = await Round.findOne({ status: { $in: ["open", "closed"] } })
-      .sort({ number: -1 })
-      .lean();
-    if (!round || !round.matches || !round.matches.length) return null;
-
-    const now = new Date();
-    const nowMs = now.getTime();
-    const matchDurationMs = (config.football.matchDurationMinutes || 130) * 60 * 1000;
-    const preLiveWindowMs = 15 * 60 * 1000;
-
-    for (const m of round.matches) {
-      if (!m || !m.startsAt) continue;
-      const startMs = new Date(m.startsAt).getTime();
-      if (!Number.isFinite(startMs)) continue;
-      // Jogo live, ou a começar em até 15 min, ou terminado há menos de 5 min
-      const finishedRecently = m.status === "finished" && nowMs <= startMs + matchDurationMs + 5 * 60 * 1000;
-      if (m.status === "live" || startMs - nowMs <= preLiveWindowMs || startMs <= nowMs || finishedRecently) {
-        return round;
-      }
-    }
-
-    return null;
+  // Rodadas com jogo relevante para monitorar — não só a de maior número. Antes,
+  // quando a rodada seguinte nascia, a anterior com jogos em andamento saía do
+  // radar e ficava presa em "ao vivo" com o placar antigo.
+  // Inclui "closed": depois do fechamento (2h antes do 1º jogo) os placares ao
+  // vivo continuam sendo atualizados — só os palpites param.
+  async function roundsToWatch() {
+    const rounds = await Round.find({
+      status: { $in: ["open", "closed"] },
+      "matches.status": { $in: ["live", "scheduled"] },
+    }).sort({ number: -1 }).limit(5).lean();
+    return rounds.filter((round) => hasRelevantMatch(round));
   }
 
   const tick = async () => {
     try {
-      const round = await livePollLoop();
-      if (!round) {
-        // Nenhuma rodada aberta ou sem jogos relevantes
+      const rounds = await roundsToWatch();
+      if (!rounds.length) {
+        // Nenhuma rodada com jogo relevante
         liveTimer = setTimeout(tick, 15 * 60 * 1000);
         return;
       }
 
-      if (await shouldPollLive(round)) {
-        const items = await listLive();
-        const res = await applyLive(items);
-        if (res.updated) logger.debug(res, "placares ao vivo atualizados");
-      }
+      const items = await listLive();
+      // applyLive já reconcilia quem saiu da lista ao vivo (jogo encerrado).
+      const res = await applyLive(items);
+      if (res.updated || res.reconciled) logger.debug(res, "placares atualizados");
+      // Placar fechado neste ciclo? Pontua na hora — é isto que dá ponto ao palpite.
+      if (res.reconciled) await scoreFinishedRounds();
 
-      // Calcula próximo intervalo baseado no estado atual
-      const delayMs = await getNextPollDelay(round);
-      liveTimer = setTimeout(tick, delayMs);
+      // Próximo intervalo pelo estado mais urgente entre as rodadas monitoradas.
+      const delays = await Promise.all(rounds.map((round) => getNextPollDelay(round)));
+      liveTimer = setTimeout(tick, Math.min(...delays));
     } catch (e) {
       logger.warn({ err: String(e && e.message) }, "falha no polling de ao vivo");
       // Em caso de erro, aguarda para não gastar a cota em tentativas seguidas.

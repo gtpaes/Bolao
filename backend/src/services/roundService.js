@@ -145,6 +145,12 @@ async function listAdminMatches(roundId) {
   return (round.matches || []).map(toMatchDTO);
 }
 
+// Jogos ao vivo saem do banco (o poller/sync mantém os placares atualizados).
+// Uma linha "live" antiga demais é dado travado, não jogo em andamento: um jogo
+// dura ~130 min, então acima disso ela é ignorada em vez de aparecer como "ao
+// vivo" por horas depois de ter terminado.
+const STALE_LIVE_MS = ((config.football.matchDurationMinutes || 130) + 15) * 60 * 1000;
+
 async function listLive() {
   const rounds = await Round.find({ status: { $in: ["open", "closed"] }, "matches.status": "live" })
     .sort({ number: -1 })
@@ -153,7 +159,10 @@ async function listLive() {
   const out = [];
   for (const r of rounds) {
     for (const m of r.matches || []) {
-      if (m.status === "live") out.push(toMatchDTO(m));
+      if (m.status !== "live") continue;
+      const startMs = m.startsAt ? new Date(m.startsAt).getTime() : null;
+      if (startMs != null && Number.isFinite(startMs) && Date.now() - startMs > STALE_LIVE_MS) continue;
+      out.push(toMatchDTO(m));
     }
   }
   return out;

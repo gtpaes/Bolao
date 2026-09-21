@@ -3,7 +3,7 @@ const Ticket = require("../models/Ticket");
 const User = require("../models/User");
 const Payment = require("../models/Payment");
 const settingsService = require("../services/settingsService");
-const { syncRound } = require("../integrations/football/sync");
+const { syncRound, reconcilePendingRounds } = require("../integrations/football/sync");
 const { scoreFinishedRounds } = require("../services/scoringService");
 const { closeRound: closeRoundService, reopenRound: reopenRoundService, setAutomatic, closesAt } = require("../services/roundLifecycle");
 const { badRequest, notFound } = require("../utils/errors");
@@ -89,14 +89,15 @@ async function setRoundAutomatic(req, res, next) {
   } catch (e) { return next(e); }
 }
 
+// Reparo manual: sincroniza a rodada-alvo, reconcilia rodadas anteriores que
+// ainda tenham jogo pendente (travado em "ao vivo" ou sem placar) e repontua.
 async function syncNow(req, res, next) {
   try {
     const force = req.body && req.body.round != null ? Number(req.body.round) : undefined;
     const result = await syncRound(force);
-    if (result && result.round != null) {
-      await scoreFinishedRounds();
-    }
-    return res.json({ ok: true, ...result });
+    const reconciled = await reconcilePendingRounds();
+    await scoreFinishedRounds();
+    return res.json({ ok: true, ...result, reconciled });
   } catch (e) { return next(e); }
 }
 

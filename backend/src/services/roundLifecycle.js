@@ -14,11 +14,14 @@ const Ticket = require("../models/Ticket");
 
 const AUTO_CLOSE_WINDOW_MS = 2 * 60 * 60 * 1000;
 
-// Menor startsAt entre os jogos da rodada (jogos sem data são ignorados).
+// Menor startsAt entre os jogos HABILITADOS da rodada (jogos sem data são
+// ignorados). Jogo desabilitado não pode definir o fechamento: um jogo manual de
+// teste com horário antigo já antecipou o fechamento dos palpites em 1 hora.
 function firstMatchStart(round) {
   let best = null;
   for (const match of (round && round.matches) || []) {
-    if (!match || !match.startsAt) continue;
+    if (!match || match.enabledForTickets === false) continue;
+    if (!match.startsAt) continue;
     const value = new Date(match.startsAt).getTime();
     if (!Number.isFinite(value)) continue;
     if (best === null || value < best) best = value;
