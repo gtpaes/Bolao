@@ -42,7 +42,7 @@ export async function render(view) {
 
     const statDefs = [
       { ico: "calendar-clock", label: "Rodada atual", value: hasRound ? `Rodada ${round.number}` : "—", sub: hasRound ? round.status : "Sem rodada" },
-      { ico: "ticket", label: "Meus tickets", value: String(tickets.length), sub: "tickets ativos" },
+      { ico: "ticket", label: "Meus tickets", value: String(tickets.length), sub: "nesta rodada" },
       { ico: "target", label: "Minha pontuação", value: "—", sub: "sem dados" },
       { ico: "list-ordered", label: "Minha posição", value: "—", sub: "sem dados" },
     ];
@@ -90,7 +90,7 @@ export function matchCardSmall(m) {
   const topLabel = m.live ? '<span class="live-inline"><span class="dot"></span>Ao vivo</span>' : esc(STATUS_LABEL[m.status] || m.status || "");
   c.innerHTML = `
     <div class="match-top">
-      <span>${esc(m.date ? dateShort(m.date) : "Em breve")}</span>
+      <span>${esc(m.date ? `${dateShort(m.date)} · ${time(m.date)}` : "Em breve")}</span>
       ${topLabel}
     </div>
     <div class="match-teams">
@@ -109,4 +109,4 @@ function crest(src) {
 function esc(v) {
   return String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
-import { dateShort } from "../../utils/format.js";
+import { dateShort, time } from "../../utils/format.js";

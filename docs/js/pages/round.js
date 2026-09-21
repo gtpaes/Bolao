@@ -4,7 +4,7 @@ import { getCurrentRound, isRoundClosed, roundClosesAt } from "../api/rounds.js"
 import { listMatches } from "../api/matches.js";
 import { stateNode } from "../../utils/states.js";
 import { countdown } from "../../components/countdown.js";
-import { dateShort, time } from "../../utils/format.js";
+import { dateShort, dateTime, time } from "../../utils/format.js";
 import { matchCardSmall } from "./dashboard.js";
 
 // Fallback quando o backend ainda não respondeu (mesmos padrões do servidor).
@@ -30,6 +30,12 @@ export async function render(view) {
     if (round) {
       const closed = isRoundClosed(round);
       const badge = closed ? '<span class="badge badge-gray">Palpites encerrados</span>' : '<span class="badge badge-green">Palpites abertos</span>';
+      // Fechamento e horário do 1º jogo explícitos (em Brasília): só o contador não
+      // diz "que horas fecha". O 1º jogo é o mais cedo da rodada = round.date.
+      const closesAt = roundClosesAt(round);
+      const windowInfo = closesAt
+        ? `Fecha <strong>${dateTime(closesAt)}</strong> (2h antes do 1º jogo${round.date ? `, ${dateTime(round.date)}` : ""}).`
+        : "";
       const card = document.createElement("div");
       card.innerHTML = `
         <div class="card">
@@ -41,6 +47,7 @@ export async function render(view) {
           <div class="divider"></div>
           ${closed ? `<p class="t-muted">Os palpites desta rodada foram encerrados.</p>` : `
             <p class="t-ttl" style="margin-bottom:var(--space-3)">Data limite para palpites</p>
+            ${windowInfo ? `<p class="t-muted t-small">${windowInfo}</p>` : ""}
             <div id="round-countdown"></div>`}
         </div>`;
             if (sumHost) sumHost.replaceChildren(card);

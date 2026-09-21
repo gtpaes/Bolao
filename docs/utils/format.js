@@ -1,5 +1,12 @@
 /* utils/format.js — Formatação de valores, datas e textos */
 
+/* O bolão é brasileiro: os horários são SEMPRE exibidos em Brasília (UTC−3),
+   independente do fuso do dispositivo. Antes usávamos o fuso do navegador, então
+   quem abria o site de outro fuso (ou com o navegador em UTC) via o jogo das
+   19:30 como 22:30 e o fechamento das 17:30 como 20:30 — e um jogo de 21:30
+   (00:30Z do dia seguinte) aparecia com a data errada. */
+const TZ = "America/Sao_Paulo";
+
 /** Formata BRL: 1500 -> "R$ 1.500,00" */
 export function brl(v) {
   const n = Number(v) || 0;
@@ -16,7 +23,7 @@ export function dateShort(v) {
   if (!v) return "—";
   const d = v instanceof Date ? v : new Date(v);
   if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: TZ });
 }
 
 /** Data ISO/Date -> data + hora curta */
@@ -24,8 +31,8 @@ export function dateTime(v) {
   if (!v) return "—";
   const d = v instanceof Date ? v : new Date(v);
   if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
-    " às " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: TZ }) +
+    " às " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
 }
 
 /** Hora curta (HH:MM) */
@@ -33,7 +40,7 @@ export function time(v) {
   if (!v) return "—";
   const d = v instanceof Date ? v : new Date(v);
   if (isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
 }
 
 /** Iniciais do nome para avatar */
