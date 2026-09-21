@@ -22,7 +22,13 @@ export async function render(view) {
     let round = null;
     try { round = (await getCurrentRound()).round; } catch (e) { /* noop */ }
     let tickets = [];
-    try { tickets = (await listTickets()).tickets || []; } catch (e) { tickets = []; }
+    try {
+      const data = await listTickets();
+      tickets = data.tickets || [];
+      // O servidor já devolve só a rodada corrente; o filtro protege a tela se a
+      // rodada mudar entre as duas chamadas (ticket antigo não serve para palpitar).
+      if (data.round && data.round.id && round && round.id && data.round.id !== round.id) tickets = [];
+    } catch (e) { tickets = []; }
 
     // A trava vem resolvida do servidor (can_pick), incluindo a regra "1º jogo − 2h";
     // antes a tela mostrava "Abertos" com a rodada já encerrada.
@@ -31,12 +37,17 @@ export async function render(view) {
       closed ? '<span class="badge badge-gray">Encerrados</span>' : '<span class="badge badge-green">Abertos</span>';
 
     if (!tickets.length) {
-      pickerHost.replaceChildren(stateNode("empty", { title: "Você precisa de um ticket", message: "Compre ao menos um ticket para fazer seus palpites." }));
-      pickerHost.insertAdjacentHTML("afterend", `<div class="state" style="padding:var(--space-5)"><a class="btn btn-primary btn-lg" href="#/buy">Comprar tickets</a></div>`);
+      // Sem ticket DESTA rodada: nada de oferecer o ticket da rodada anterior.
+      const title = closed ? "Rodada encerrada" : "Você precisa de um ticket nesta rodada";
+      const message = closed
+        ? "Os palpites desta rodada estão encerrados. Seus tickets e a pontuação ficam no histórico."
+        : "Cada ticket vale para uma rodada: compre um ticket desta rodada para palpitar.";
+      pickerHost.replaceChildren(stateNode("empty", { title, message }));
+      pickerHost.insertAdjacentHTML("afterend", `<div class="state" style="padding:var(--space-5)"><a class="btn btn-primary btn-lg" href="#/buy">Comprar tickets</a> <a class="btn btn-ghost btn-lg" href="#/history">Ver histórico</a></div>`);
       return;
     }
 
-    const activeTicket = tickets[0];
+    const activeTicket = tickets.find((t) => t.status === "released") || tickets[0];
     let selectedTicket = activeTicket;
     const picker = document.createElement("div");
     picker.innerHTML = `

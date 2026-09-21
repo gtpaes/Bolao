@@ -21,20 +21,28 @@ export async function render(view) {
     const tabs = view.querySelector("#ticket-tabs");
     const statuses = [
       ["all", "Todos"],
-      ["active", "Ativos"],
       ["released", "Liberados"],
-      ["waiting_payment", "Por pagar"],
-      ["finished", "Finalizados"],
+      ["closed", "Encerrados"],
+      ["scored", "Pontuados"],
     ];
     tabs.innerHTML = statuses.map(([k, l]) => `<button class="tab ${k === "all" ? "active" : ""}" data-s="${k}">${l}</button>`).join("");
 
-    let tickets = [];
-    try { tickets = (await listTickets()).tickets || []; } catch (e) { tickets = []; }
+    let data = { tickets: [], round: null };
+    try { data = await listTickets(); } catch (e) { data = { tickets: [], round: null }; }
+    const tickets = data.tickets || [];
     const listHost = view.querySelector('[data-host="tickets"]');
 
+    // Cada ticket vale para UMA rodada: aqui aparecem só os da rodada corrente.
+    // Os tickets das rodadas anteriores ficam no histórico (com palpites e pontos).
+    listHost.insertAdjacentHTML("beforebegin",
+      `<p class="t-muted t-small">${data.round ? `Tickets da <b>rodada ${esc(String(data.round.number))}</b>.` : "Nenhuma rodada corrente."} Os tickets de rodadas anteriores ficam no <a href="#/history">histórico</a>.</p>`);
+
     if (!tickets.length) {
-      listHost.replaceChildren(stateNode("empty", { title: "Você ainda não tem tickets", message: "Compre um ticket para começar a participar na rodada." }));
-      listHost.insertAdjacentHTML("afterend", `<div class="state" style="padding:var(--space-5)"><a class="btn btn-primary btn-lg" href="#/buy">Comprar tickets</a></div>`);
+      listHost.replaceChildren(stateNode("empty", {
+        title: data.round ? `Sem tickets na rodada ${data.round.number}` : "Você ainda não tem tickets",
+        message: "Cada ticket participa de uma rodada: compre um ticket desta rodada para palpitar.",
+      }));
+      listHost.insertAdjacentHTML("afterend", `<div class="state" style="padding:var(--space-5)"><a class="btn btn-primary btn-lg" href="#/buy">Comprar tickets</a> <a class="btn btn-ghost btn-lg" href="#/history">Ver histórico</a></div>`);
       return;
     }
 

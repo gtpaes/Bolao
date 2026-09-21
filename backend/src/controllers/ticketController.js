@@ -2,8 +2,11 @@ const ticketService = require("../services/ticketService");
 const paymentService = require("../services/paymentService");
 const { badRequest } = require("../utils/errors");
 
+// GET /api/tickets           -> só a rodada corrente (cada ticket vale por rodada)
+// GET /api/tickets?round=all -> todas as rodadas (auditoria/compatibilidade)
+// GET /api/tickets?round=<id> -> uma rodada específica
 async function list(req, res, next) {
-  try { return res.json({ tickets: await ticketService.listMyTickets(req.user.id) }); }
+  try { return res.json(await ticketService.listMyTickets(req.user.id, { roundId: req.query.round })); }
   catch (e) { return next(e); }
 }
 

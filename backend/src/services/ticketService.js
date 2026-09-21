@@ -1,6 +1,7 @@
 const Ticket = require("../models/Ticket");
 const Round = require("../models/Round");
 const Pick = require("../models/Pick");
+const { Types } = require("mongoose");
 const { isRoundOpenForPicks } = require("./roundLifecycle");
 const { badRequest, forbidden, notFound, paymentRequired } = require("../utils/errors");
 
@@ -19,6 +20,8 @@ function toTicketDTO(t, round) {
   return {
     id: String(o._id),
     number: o.number,
+    round_id: round ? String(round._id) : (o.roundId ? String(o.roundId) : null),
+    round_number: round ? round.number : null,
     round_label: round ? `Rodada ${round.number}` : "—",
     status: o.status === "released" ? "released" : o.status === "waiting_payment" ? "waiting_payment" : o.status,
     picks_count: (o.picks || []).length,
@@ -31,12 +34,44 @@ function toTicketDTO(t, round) {
   };
 }
 
-async function listMyTickets(userId) {
-  const tickets = await Ticket.find({ userId, status: { $in: ["released", "closed", "scored"] } }).sort({ createdAt: -1 }).lean();
+// Rodada a que a lista de tickets pertence: a que está ABERTA (é onde dá para
+// comprar e palpitar). Sem rodada aberta, mantém a de maior número para a tela
+// não ficar vazia enquanto a próxima rodada ainda não nasceu.
+async function activeRound() {
+  const open = await Round.findOne({ status: "open" }).sort({ number: -1 }).lean();
+  return open || Round.findOne({}).sort({ number: -1 }).lean();
+}
+
+// Um ticket vale para UMA rodada. A lista devolve só a rodada corrente, então ao
+// encerrar a rodada os tickets dela saem das telas ativas (palpites, Meus Tickets
+// e Dashboard) e passam a viver no Histórico/Ranking. Nada é apagado: os
+// documentos continuam sendo a fonte da pontuação, do ranking e da auditoria.
+async function listMyTickets(userId, { roundId } = {}) {
+  const requested = Array.isArray(roundId) ? roundId[0] : roundId;
+  let targetRound = null;
+  if (requested !== "all") {
+    if (requested) {
+      if (!Types.ObjectId.isValid(String(requested))) throw badRequest("Rodada inválida.");
+      targetRound = await Round.findById(String(requested)).lean();
+      if (!targetRound) throw notFound("Rodada não encontrada.");
+    } else {
+      targetRound = await activeRound();
+    }
+  }
+
+  const query = { userId, status: { $in: ["released", "closed", "scored"] } };
+  if (targetRound) query.roundId = targetRound._id;
+  const tickets = await Ticket.find(query).sort({ createdAt: -1 }).lean();
   const roundIds = [...new Set(tickets.map((t) => String(t.roundId)))];
   const rounds = await Round.find({ _id: { $in: roundIds } }).lean();
   const byId = new Map(rounds.map((r) => [String(r._id), r]));
-  return tickets.map((t) => toTicketDTO(t, byId.get(String(t.roundId))));
+  return {
+    round: targetRound
+      ? { id: String(targetRound._id), number: targetRound.number, status: targetRound.status }
+      : null,
+    all_rounds: requested === "all",
+    tickets: tickets.map((t) => toTicketDTO(t, byId.get(String(t.roundId)))),
+  };
 }
 
 async function getMyTicket(userId, ticketId) {
