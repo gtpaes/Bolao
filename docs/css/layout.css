@@ -27,6 +27,11 @@
   width: 100%; max-width: 400px;
 }
 .auth-logo { display: inline-flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-5); }
+/* A marca visível é a imagem da logo (docs/assets/logo.png), não mais o ícone Lucide.
+   `overflow: hidden` recorta o quadrado da imagem no formato arredondado do selo e
+   `object-fit: cover` garante o preenchimento total em qualquer tamanho (38/42px). */
+.logo-mark { overflow: hidden; }
+.logo-mark img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .auth-logo .logo-mark {
   width: 38px; height: 38px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center;
   background: var(--green-500); color: #fff;

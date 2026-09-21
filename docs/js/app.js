@@ -82,7 +82,7 @@ function openDrawer() {
     <div class="overlay" data-close-drawer></div>
     <aside class="drawer" aria-label="Menu">
       <div class="sb-brand">
-        <span class="logo-mark"><i data-lucide="trophy"></i></span>
+        <span class="logo-mark"><img src="assets/logo.png" alt="" /></span>
         <div><div class="logo-text">Bolão</div><div class="logo-sub">Futebol</div></div>
       </div>
       <nav class="sb-nav" data-drawer-nav></nav>

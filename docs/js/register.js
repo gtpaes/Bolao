@@ -1,11 +1,15 @@
 /* js/register.js — Lógica da página de Cadastro */
 import { initTheme } from "./theme.js";
 import { isEmail } from "../utils/format.js";
+import { hydrateIcons } from "../utils/dom.js";
 import { register } from "./api/auth.js";
 import { toastError, toastSuccess, toastInfo } from "../components/toast.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
+  // Converte os <i data-lucide> do HTML em SVG já no carregamento
+  // (ícones do painel lateral e dos botões "mostrar senha").
+  hydrateIcons();
   document.querySelectorAll("[data-theme-toggle]").forEach((b) => b.addEventListener("click", toggleThemeBtn));
   document.querySelectorAll(".input-ico[data-target]").forEach((btn) =>
     bindToggleVisibility(btn, document.getElementById(btn.dataset.target))

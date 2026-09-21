@@ -1,11 +1,15 @@
 /* js/login.js — Lógica da página de Login */
 import { initTheme } from "./theme.js";
 import { isEmail } from "../utils/format.js";
+import { hydrateIcons } from "../utils/dom.js";
 import { login, isAuthenticated } from "./api/auth.js";
 import { toastError, toastSuccess, toastInfo } from "../components/toast.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
+  // Converte os <i data-lucide> do HTML em SVG já no carregamento
+  // (ícones do painel lateral e do botão "mostrar senha").
+  hydrateIcons();
   document.querySelectorAll("[data-theme-toggle]").forEach((b) => b.addEventListener("click", toggleThemeBtn));
 
   // Se já tem sessão, mostra e deixa o login fluir para o index
