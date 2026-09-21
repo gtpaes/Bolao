@@ -19,3 +19,9 @@ export async function paymentStatus(id) {
   // Nenhuma cobrança ativa — status desconhecido.
   return { status: "unknown", message: "sem dados" };
 }
+
+/** Cancela uma cobranca Pix pendente. */
+export async function cancelPayment(id) {
+  if (!API.mock) return request(`/payments/${id}/cancel`, { method: "POST" });
+  return operationPending("POST /api/payments/:id/cancel");
+}

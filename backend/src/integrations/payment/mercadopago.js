@@ -1,6 +1,13 @@
 const config = require("../../config/env");
 const logger = require("../../config/logger");
 
+// Converte um valor em BRL (decimal, vindo do MP) para centavos inteiros.
+// Função pura: qualquer entrada que não seja um número finito vira null,
+// inclusive strings numéricas (o MP sempre devolve number em transaction_details).
+function toCents(value) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.round(value * 100) : null;
+}
+
 // Cria cobrança Pix via Mercado Pago (Checkout Pro / Payment API).
 // Retorna { gatewayPaymentId, qrText, qrBase64, expiresAt, expiresInSeconds }.
 async function createPixCharge({ paymentId, amountCents, description, idempotencyKey, payerEmail }) {
@@ -49,11 +56,32 @@ async function fetchGatewayPayment(gatewayPaymentId) {
     const payment = new MpPayment(client);
     const res = await payment.get({ id: String(gatewayPaymentId) });
     const map = { approved: "approved", pending: "pending", in_process: "pending", rejected: "refused", cancelled: "refused", expired: "expired" };
-    return { status: map[res.status] || "pending", raw: res.status };
+    const td = res && res.transaction_details;
+    // net_received_amount é o valor líquido que cai no MP (BRL decimal) após a fee do Pix.
+    const netAmountCents = toCents(td && td.net_received_amount);
+    // fee (BRL) — opcional, diagnóstico: quanto o MP descontou da bruta cobrada ao cliente.
+    const feeCents = toCents(td && td.fee);
+    // total_paid_amount (BRL) — bruto pago pelo comprador (inclui a fee). Só se for número.
+    const grossAmountCents = toCents(td && td.total_paid_amount);
+    return { status: map[res.status] || "pending", raw: res.status, netAmountCents, grossAmountCents, feeCents };
   } catch (e) {
     logger.warn({ err: String(e && e.message) }, "falha ao consultar pagamento no gateway");
     return null;
   }
 }
 
-module.exports = { createPixCharge, fetchGatewayPayment };
+async function cancelGatewayPayment(gatewayPaymentId) {
+  if (!config.mp.accessToken || !gatewayPaymentId) return null;
+  try {
+    const { MercadoPagoConfig, Payment: MpPayment } = require("mercadopago");
+    const client = new MercadoPagoConfig({ accessToken: config.mp.accessToken });
+    const payment = new MpPayment(client);
+    const res = await payment.cancel({ id: String(gatewayPaymentId) });
+    return (res && res.status) || null;
+  } catch (e) {
+    logger.warn({ err: String(e && e.message) }, "falha ao cancelar pagamento no gateway");
+    return null;
+  }
+}
+
+module.exports = { createPixCharge, fetchGatewayPayment, cancelGatewayPayment, toCents };

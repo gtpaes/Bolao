@@ -14,7 +14,9 @@ async function overview(req, res, next) {
       User.countDocuments(),
       Round.countDocuments(),
       Ticket.countDocuments({ status: { $in: ["released", "closed", "scored"] } }),
-      Payment.aggregate([{ $match: { status: "approved" } }, { $group: { _id: null, total: { $sum: "$amountCents" } } }]),
+      // Receita líquida: prefere netAmountCents (Pix aprovado com fee descontada)
+      // e fallback para amountCents (payments aprovados antes da migration sem líquido).
+      Payment.aggregate([{ $match: { status: "approved" } }, { $group: { _id: null, total: { $sum: { $ifNull: ["$netAmountCents", "$amountCents"] } } } }]),
     ]);
     const current = await Round.findOne({ status: { $in: ["open", "closed", "finished"] } }).sort({ number: -1 }).lean();
     return res.json({

@@ -45,7 +45,7 @@ async function mercadopago(req, res, next) {
     const { fetchGatewayPayment } = require("../integrations/payment/mercadopago");
     const remote = await fetchGatewayPayment(gatewayPaymentId);
     const status = mapMpStatus(remote && remote.raw);
-    const payment = await confirmPaymentByGateway({ gatewayPaymentId, status, webhookEventId: eventId });
+    const payment = await confirmPaymentByGateway({ gatewayPaymentId, status, webhookEventId: eventId, netAmountCents: remote && remote.netAmountCents });
     logger.info({ payment: String(payment._id), status }, "webhook processado");
     return res.json({ ok: true });
   } catch (e) { return next(e); }

@@ -48,6 +48,7 @@ router.put("/tickets/:id/picks", authJwt, ticketController.picks);
 // Pagamentos
 router.post("/payments", authJwt, paymentController.create);
 router.get("/payments/:id/status", authJwt, paymentController.status);
+router.post("/payments/:id/cancel", authJwt, paymentController.cancel);
 
 // Ranking
 router.get("/ranking", authJwt, rankingController.ranking);

@@ -1,13 +1,19 @@
 /* js/pages/payment.js — Pagamento Pix */
 import { loadTemplate, run } from "./loader.js";
-import { get } from "../../utils/storage.js";
-import { createPayment, paymentStatus } from "../api/payments.js";
+import { get, remove } from "../../utils/storage.js";
+import { createPayment, paymentStatus, cancelPayment } from "../api/payments.js";
 import { brl } from "../../utils/format.js";
 import { esc } from "../../utils/dom.js";
 import { stateNode } from "../../utils/states.js";
-import { toastError, toastInfo } from "../../components/toast.js";
+import { toastError, toastInfo, toastSuccess } from "../../components/toast.js";
+import { confirmDialog } from "../../components/confirm.js";
+
+let stopPolling = null;
 
 export async function render(view) {
+  // Voltando para esta tela, o poller anterior vira lixo: continuaria batendo na API
+  // e escrevendo num host já descartado.
+  if (stopPolling) { stopPolling(); stopPolling = null; }
   await loadTemplate(view, "payment.html");
   await run(view, async () => {
     const order = get("pendingOrder", { qty: 1, unitPrice: 10, total: 10 });
@@ -35,7 +41,7 @@ export async function render(view) {
     try {
       payment = await createPayment({ quantity: order.qty });
       renderPixPaymentState(resultHost, payment, order, view, chip);
-      startPaymentPolling(view, payment.id, chip, resultHost);
+      stopPolling = startPaymentPolling(view, payment.id, chip, resultHost);
     } catch (e) {
       resultHost.replaceChildren(paymentErrorState(order, e));
       renderStepper(view, "error");
@@ -93,19 +99,49 @@ function renderPixPaymentState(resultHost, payment, order, view, chip) {
       }
     });
   }
+  // Botão para cancelar a compra e abortar a cobrança Pix. Ele desaparece quando o
+  // Pix é aprovado/expirado, porque aí o innerHTML do host é substituído.
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "btn btn-ghost";
+  cancelBtn.setAttribute("data-cancel-pix", "true");
+  cancelBtn.style.marginTop = "12px";
+  cancelBtn.style.width = "100%";
+  cancelBtn.innerHTML = '<i data-lucide="x-circle"></i> Cancelar compra';
+  const copyBtn = resultHost.querySelector('[data-copy-pix="true"]');
+  if (copyBtn) { copyBtn.closest("div").appendChild(cancelBtn); } else { resultHost.appendChild(cancelBtn); }
+  if (window.lucide) window.lucide.createIcons({ nodes: [cancelBtn] });
+  cancelBtn.addEventListener("click", async () => {
+    const ok = await confirmDialog({ title: "Cancelar compra?", message: "A cobrança Pix será cancelada e nenhum ticket será liberado.", confirmText: "Cancelar compra", danger: true });
+    if (!ok) return;
+    try {
+      await cancelPayment(payment.id);
+      remove("pendingOrder");
+      if (stopPolling) stopPolling();
+      toastSuccess("Compra cancelada", "A cobrança Pix foi cancelada.");
+      window.location.hash = "#/buy";
+    } catch (e) {
+      toastError("Não foi possível cancelar", e.message || "Tente novamente.");
+    }
+  });
 }
 
 async function startPaymentPolling(view, paymentId, chip, resultHost) {
   let attempts = 0;
   const maxAttempts = 36;
+  let timer = null;
+  let stopped = false;
 
   const tick = async () => {
+    if (stopped) return;
     attempts += 1;
     try {
       const status = await paymentStatus(paymentId);
+      // O usuário pode ter cancelado enquanto esta requisição estava no ar.
+      if (stopped) return;
       const current = String(status && status.status ? status.status : "pending");
 
       if (current === "approved") {
+        stopped = true;
         renderStepper(view, "approved");
         chip.textContent = "Pagamento aprovado";
         resultHost.innerHTML = `
@@ -118,13 +154,17 @@ async function startPaymentPolling(view, paymentId, chip, resultHost) {
         return;
       }
 
-      if (current === "expired" || current === "refused") {
+      if (current === "expired" || current === "refused" || current === "cancelled") {
+        stopped = true;
         renderStepper(view, "error");
-        chip.textContent = current === "expired" ? "Pix expirado" : "Pagamento recusado";
+        // "cancelled" também chega aqui: a compra pode ter sido cancelada em outra aba.
+        const chipText = { expired: "Pix expirado", refused: "Pagamento recusado", cancelled: "Compra cancelada" }[current];
+        const titleText = { expired: "Cobrança expirada", refused: "Pagamento recusado", cancelled: "Compra cancelada" }[current];
+        chip.textContent = chipText;
         resultHost.innerHTML = `
           <div class="pix-status">
             <span class="ps-big-ico" style="background:var(--danger-bg);color:var(--danger)"><i data-lucide="alert-circle"></i></span>
-            <h3>${current === "expired" ? "Cobrança expirada" : "Pagamento recusado"}</h3>
+            <h3>${titleText}</h3>
             <p class="t-muted">Tente gerar uma nova cobrança e repetir a compra.</p>
           </div>`;
         if (window.lucide) window.lucide.createIcons({ nodes: resultHost });
@@ -132,19 +172,20 @@ async function startPaymentPolling(view, paymentId, chip, resultHost) {
       }
 
       if (attempts < maxAttempts) {
-        setTimeout(tick, 5000);
+        timer = setTimeout(tick, 5000);
       } else {
         renderStepper(view, "waiting");
         chip.textContent = "Aguardando confirmação";
       }
     } catch (e) {
       if (attempts < maxAttempts) {
-        setTimeout(tick, 5000);
+        timer = setTimeout(tick, 5000);
       }
     }
   };
 
-  setTimeout(tick, 2000);
+  timer = setTimeout(tick, 2000);
+  return () => { stopped = true; if (timer) clearTimeout(timer); };
 }
 
 function paymentErrorState(order, err) {

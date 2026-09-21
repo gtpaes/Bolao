@@ -28,7 +28,7 @@ export async function adminDashboard(view) {
       { ico: "users", label: "Usuários", value: String(overview.users || 0) },
       { ico: "calendar-clock", label: "Rodadas", value: String(overview.rounds || 0) },
       { ico: "ticket", label: "Tickets pagos", value: String(overview.tickets || 0) },
-      { ico: "circle-dollar-sign", label: "Receitas", value: brl((overview.revenueCents || 0) / 100) },
+            { ico: "circle-dollar-sign", label: "Receita (líquida)", value: brl((overview.revenueCents || 0) / 100) },
     ];
     view.querySelector("#admin-stats").replaceChildren(...stats.map(statCard));
 

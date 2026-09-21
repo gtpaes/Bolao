@@ -16,4 +16,11 @@ async function status(req, res, next) {
   } catch (e) { return next(e); }
 }
 
-module.exports = { create, status };
+async function cancel(req, res, next) {
+  try {
+    const data = await paymentService.cancelPayment(req.user.id, req.params.id);
+    return res.json(data);
+  } catch (e) { return next(e); }
+}
+
+module.exports = { create, status, cancel };

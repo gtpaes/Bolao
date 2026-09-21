@@ -4,7 +4,7 @@ const Settings = require("../models/Settings");
 const Round = require("../models/Round");
 const Payment = require("../models/Payment");
 const logger = require("../config/logger");
-const { createPixCharge, fetchGatewayPayment } = require("../integrations/payment/mercadopago");
+const { createPixCharge, fetchGatewayPayment, cancelGatewayPayment } = require("../integrations/payment/mercadopago");
 const { autoCloseIfDue, isRoundOpenForPicks } = require("./roundLifecycle");
 const { newIdempotencyKey } = require("../utils/idempotency");
 const { badRequest, forbidden, notFound } = require("../utils/errors");
@@ -85,11 +85,13 @@ async function getPaymentStatus(userId, paymentId) {
   if (!p || String(p.userId) !== String(userId)) throw notFound("Pagamento não encontrado.");
   await refreshFromGateway(p);
   const current = await Payment.findById(paymentId).lean();
-  return { status: current.status, message: statusMessage(current.status) };
+  // Exige netAmountCents: o frontend mostra quanto efetivamente caiu no MP
+  // (brute amount menos a fee do Pix). Null para aprovados antes da migration.
+  return { status: current.status, message: statusMessage(current.status), amountCents: current.amountCents, netAmountCents: current.netAmountCents };
 }
 
 function statusMessage(status) {
-  const map = { pending: "Aguardando pagamento", approved: "Pagamento aprovado", expired: "Pagamento expirado", refused: "Pagamento recusado" };
+  const map = { pending: "Aguardando pagamento", approved: "Pagamento aprovado", expired: "Pagamento expirado", cancelled: "Compra cancelada", refused: "Pagamento recusado" };
   return map[status] || status;
 }
 
@@ -98,18 +100,22 @@ async function refreshFromGateway(payment) {
   const remote = await fetchGatewayPayment(payment.gatewayPaymentId);
   if (!remote || !remote.status) return payment;
   if (remote.status === payment.status && !(remote.status === "approved" && !(payment.ticketIds || []).length)) return payment;
-  if (remote.status === "approved") return releasePaymentTickets(payment._id, "approved");
+  if (remote.status === "approved") return releasePaymentTickets(payment._id, "approved", remote && remote.netAmountCents);
   if (payment.status !== "approved") await Payment.updateOne({ _id: payment._id }, { $set: { status: remote.status } });
   return Payment.findById(payment._id).lean();
 }
 
-async function releasePaymentTickets(paymentId, status) {
+async function releasePaymentTickets(paymentId, status, netAmountCents) {
   const session = await Payment.startSession();
   let result;
   try {
     await session.withTransaction(async () => {
       const payment = await Payment.findById(paymentId).session(session);
       if (!payment) throw notFound("Pagamento não encontrado.");
+      if (payment.status === "cancelled") {
+        result = payment.toObject();
+        return;
+      }
       if (payment.status === "approved" && payment.ticketIds && payment.ticketIds.length) {
         result = payment.toObject();
         return;
@@ -144,6 +150,8 @@ async function releasePaymentTickets(paymentId, status) {
       const created = await Ticket.insertMany(docs, { ordered: true, session });
       payment.ticketIds = created.map((ticket) => ticket._id);
       payment.status = "approved";
+      // grava o líquido efetivamente creditado no MP (com a fee do Pix já descontada).
+      if (typeof netAmountCents === "number") payment.netAmountCents = netAmountCents;
       await payment.save({ session });
       result = payment.toObject();
     });
@@ -154,7 +162,7 @@ async function releasePaymentTickets(paymentId, status) {
 }
 
 // Chamado SOMENTE pelo webhook (assinatura validada na rota). Idempotente.
-async function confirmPaymentByGateway({ gatewayPaymentId, status, webhookEventId }) {
+async function confirmPaymentByGateway({ gatewayPaymentId, status, webhookEventId, netAmountCents }) {
   if (!gatewayPaymentId) throw badRequest("gatewayPaymentId ausente.");
   if (webhookEventId) {
     const dup = await Payment.findOne({ webhookEventId }).lean();
@@ -164,7 +172,24 @@ async function confirmPaymentByGateway({ gatewayPaymentId, status, webhookEventI
   if (!payment) throw notFound("Pagamento não encontrado.");
   if (webhookEventId) payment.webhookEventId = webhookEventId;
   if (payment.status === "approved" && payment.ticketIds && payment.ticketIds.length) return payment.toObject();
-  return releasePaymentTickets(payment._id, status);
+  return releasePaymentTickets(payment._id, status, netAmountCents);
 }
 
-module.exports = { createPayment, getPaymentStatus, confirmPaymentByGateway, UNIT_PRICE_CENTS };
+async function cancelPayment(userId, paymentId) {
+  const payment = await Payment.findById(paymentId);
+  if (!payment || String(payment.userId) !== String(userId)) throw notFound("Pagamento não encontrado.");
+  if (payment.status === "approved") throw forbidden("Pagamento já aprovado não pode ser cancelado.");
+  if (payment.status === "cancelled") return payment.toObject();
+  if (payment.gatewayPaymentId) {
+    try {
+      await cancelGatewayPayment(payment.gatewayPaymentId);
+    } catch (e) {
+      logger.warn({ err: String(e && e.message) }, "falha ao cancelar no gateway");
+    }
+  }
+  payment.status = "cancelled";
+  await payment.save();
+  return payment.toObject();
+}
+
+module.exports = { createPayment, getPaymentStatus, confirmPaymentByGateway, cancelPayment, UNIT_PRICE_CENTS };

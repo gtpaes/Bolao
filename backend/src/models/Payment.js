@@ -7,9 +7,13 @@ const paymentSchema = new Schema(
     quantity: { type: Number, required: true, min: 1, max: 100 },
     ticketIds: [{ type: Types.ObjectId, ref: "Ticket" }],
     amountCents: { type: Number, required: true, min: 1 },
+    // Líquido efetivamente creditado no MP após a fee do Pix.
+    // Preenchido na validação (webhook/getPaymentStatus) quando approved.
+    // Fica null para aprovados antes dessa migration -> Receita usa amountCents como fallback.
+    netAmountCents: { type: Number, default: null, min: 0 },
     status: {
       type: String,
-      enum: ["pending", "approved", "expired", "refused"],
+      enum: ["pending", "approved", "expired", "refused", "cancelled"],
       default: "pending",
       index: true,
     },
