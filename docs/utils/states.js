@@ -74,3 +74,38 @@ export function optionsToSelect(opts, current) {
     .map((o) => `<option value="${esc(o.value)}" ${o.value === current ? "selected" : ""}>${esc(o.label)}</option>`)
     .join("");
 }
+/* ---------- Erro na tela ---------- */
+
+/**
+ * Mensagem que pode ser mostrada ao usuário. Só os erros marcados pelo backend
+ * (`userFacing`) têm mensagem própria; erro técnico (TypeError, DOMException,
+ * falha de rede) vira texto genérico — o detalhe fica no console.
+ */
+export function friendlyMessage(error) {
+  if (error && error.userFacing && error.message) return error.message;
+  return "Não foi possível carregar esta seção. Tente novamente.";
+}
+
+/**
+ * Estado de erro de uma seção que não carregou.
+ * @param {Error} error
+ * @param {{title?: string, onRetry?: Function}} opts
+ */
+export function errorState(error, opts = {}) {
+  const wrap = el(`
+    <div class="state" role="alert">
+      <span class="state-ico danger"><i data-lucide="alert-circle"></i></span>
+      <h3>${esc(opts.title || "Não foi possível carregar")}</h3>
+      <p>${esc(friendlyMessage(error))}</p>
+      ${opts.onRetry ? `<button class="btn btn-outline" type="button" data-retry>Tentar novamente</button>` : ""}
+    </div>
+  `);
+  const retry = wrap.querySelector("[data-retry]");
+  if (retry && typeof opts.onRetry === "function") retry.addEventListener("click", opts.onRetry);
+  return wrap;
+}
+
+/** Loga o erro completo APENAS no console (devtools); nunca na interface. */
+export function logError(error) {
+  if (typeof console !== "undefined" && console.error) console.error(error);
+}

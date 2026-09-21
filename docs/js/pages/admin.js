@@ -188,7 +188,8 @@ export async function adminMatches(view) {
       }
     });
 
-    view.querySelector("#admin-add-match").addEventListener("click", () => {
+    // `?.` porque este id vem do template: se ele mudar, a página não estoura.
+    view.querySelector("#admin-add-match")?.addEventListener("click", () => {
       const body = document.createElement("div");
       body.innerHTML = `
         <div class="field"><label for="m-home">Equipe local</label><input class="input" id="m-home" /></div>

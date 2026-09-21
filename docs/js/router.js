@@ -2,6 +2,7 @@
 
 import { requireAuth, currentRole, currentProfile } from "./api/auth.js";
 import { hydrateIcons, qsa } from "../utils/dom.js";
+import { errorState, logError } from "../utils/states.js";
 import { pages } from "./pages/index.js";
 
 const ROUTES = [
@@ -45,6 +46,10 @@ function currentFullPath() {
   return raw || "dashboard";
 }
 
+// Época da renderização: incrementada a cada navegação. O loader lê este número
+// para descartar páginas que terminam de carregar depois de outra navegação.
+let renderEpoch = 0;
+
 async function render() {
   if (!requireAuth()) return;
   const full = currentFullPath();
@@ -66,6 +71,8 @@ async function render() {
   closeDrawer();
 
   const view = document.getElementById("app-view");
+  const epoch = String(++renderEpoch);
+  view.dataset.render = epoch;
   view.innerHTML = `<div class="state" role="status"><span class="spinner"></span><p>Carregando seção…</p></div>`;
 
   const page = pages[full] || pages[fallbackPath(full, role)];
@@ -77,13 +84,18 @@ async function render() {
   try {
     await page.render(view);
   } catch (e) {
-    console.error(e);
-    view.insertAdjacentHTML("beforeend", `
-      <div class="state"><span class="state-ico danger"><i data-lucide="alert-circle"></i></span>
-      <h3>Falha ao carregar</h3><p>${e && e.message ? e.message : "Erro inesperado."}</p></div>`);
+    logError(e);
+    if (view.dataset.render !== epoch) return; // outra navegação já assumiu a tela
+    view.replaceChildren(errorState(e, { onRetry: reloadCurrentRoute }));
   }
+  if (view.dataset.render !== epoch) return; // a página nova manda; esta é descartada
   hydrateIcons(view);
   window.scrollTo(0, 0);
+}
+
+/** Recarrega a rota atual — usado pelo botão "Tentar novamente" do estado de erro. */
+export function reloadCurrentRoute() {
+  return render();
 }
 
 function fallbackPath(full, role) {

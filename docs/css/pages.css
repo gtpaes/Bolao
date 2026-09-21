@@ -124,3 +124,10 @@
 .mini-bars i:nth-child(4){height: 90%; animation-delay:.1s}
 .mini-bars i:nth-child(5){height: 62%; animation-delay:.5s}
 @keyframes bars { from { transform: scaleY(.55); } to { transform: scaleY(1); } }
+/* Ranking: a coluna de ticket é secundária e sai em telas estreitas — as demais
+   continuam legíveis, sem depender de rolagem horizontal. */
+@media (max-width: 560px) {
+  .col-ticket { display: none; }
+}
+/* Seções que o JS liga/desliga (ex.: rodada anterior do Ranking). */
+.card[hidden] { display: none; }

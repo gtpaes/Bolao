@@ -4,6 +4,8 @@ const ScoreLog = require("../models/ScoreLog");
 const Pick = require("../models/Pick");
 const { scorePick, POINTS } = require("../utils/scoring");
 const { getScoringRules } = require("./settingsService");
+const { badRequest } = require("../utils/errors");
+const { Types } = require("mongoose");
 const logger = require("../config/logger");
 
 // Processa a pontuação de UMA rodada (idempotente por ScoreLog único).
@@ -70,19 +72,14 @@ async function scoreFinishedRounds() {
   return { rounds: rounds.length, processed: totalProcessed };
 }
 
-async function getRanking(roundId) {
-  let round = null;
-  if (roundId) {
-    round = await Round.findById(roundId).lean();
-  }
-  if (!round) {
-    round = await Round.findOne({}).sort({ number: -1 }).lean();
-  }
-  if (!round) return { ranking: [], myPosition: null };
+// Monta o ranking de UMA rodada, ordenado por pontos. Fica isolado porque a
+// página mostra a rodada atual E a anterior.
+async function rankingForRound(round) {
+  if (!round) return [];
   const tickets = await Ticket.find({ roundId: round._id, status: { $in: ["released", "closed", "scored"] } })
     .populate("userId", "username")
     .lean();
-  const ranking = tickets
+  return tickets
     .filter((ticket) => Array.isArray(ticket.picks) && ticket.picks.length > 0)
     .map((t) => ({
       ticket_id: String(t._id),
@@ -93,7 +90,66 @@ async function getRanking(roundId) {
     }))
     .sort((a, b) => b.points - a.points || a.username.localeCompare(b.username) || a.ticket_number - b.ticket_number)
     .map((entry, index) => ({ ...entry, position: index + 1 }));
-  return { ranking, myPosition: null, roundId: String(round._id) };
 }
 
-module.exports = { processRoundScoring, getRanking, POINTS, scoreFinishedRounds };
+// Rodada do ranking: a informada (id validado) ou, sem ela, a mais recente.
+async function resolveRankingRound(roundId) {
+  if (roundId) {
+    if (!Types.ObjectId.isValid(String(roundId))) throw badRequest("Rodada inválida.");
+    const byId = await Round.findById(String(roundId)).lean();
+    if (byId) return byId;
+  }
+  return Round.findOne({}).sort({ number: -1 }).lean();
+}
+
+// Quantos tickets COM palpites cada rodada tem (uma consulta só). Serve para a
+// escolha da rodada anterior sem varrer o banco rodada a rodada.
+async function ticketCountByRound() {
+  const rows = await Ticket.aggregate([
+    { $match: { status: { $in: ["released", "closed", "scored"] }, "picks.0": { $exists: true } } },
+    { $group: { _id: "$roundId", tickets: { $sum: 1 } } },
+  ]);
+  return new Map(rows.map((row) => [String(row._id), row.tickets]));
+}
+
+// Qual rodada entra na seção "rodada anterior": a mais recente ANTES da atual que
+// tenha apostas (para a seção não nascer vazia por causa de rodada sem palpites);
+// sem nenhuma com apostas, cai na imediatamente anterior. Função pura: dá para
+// testar sem banco (a lista traz `tickets` = tickets com palpites).
+function pickPreviousRound(rounds, currentNumber) {
+  const ordered = (rounds || [])
+    .filter((round) => round && Number.isFinite(Number(round.number)) && Number(round.number) < Number(currentNumber))
+    .sort((a, b) => Number(b.number) - Number(a.number));
+  return ordered.find((round) => Number(round.tickets) > 0) || ordered[0] || null;
+}
+
+async function getRanking(roundId) {
+  const round = await resolveRankingRound(roundId);
+  if (!round) return { round: null, roundId: null, ranking: [], myPosition: null };
+  return {
+    round: { id: String(round._id), number: round.number, status: round.status },
+    roundId: String(round._id),
+    ranking: await rankingForRound(round),
+    myPosition: null,
+  };
+}
+
+// Ranking da rodada anterior à informada (ou à atual), para a segunda seção da
+// página de Ranking. Devolve { round, ranking } — round null quando não há.
+async function getPreviousRanking(roundId) {
+  const base = await resolveRankingRound(roundId);
+  if (!base) return { round: null, ranking: [] };
+  const candidates = await Round.find({ number: { $lt: base.number } }).select("number status").lean();
+  const counts = await ticketCountByRound();
+  const previous = pickPreviousRound(
+    candidates.map((round) => ({ ...round, tickets: counts.get(String(round._id)) || 0 })),
+    base.number,
+  );
+  if (!previous) return { round: null, ranking: [] };
+  return {
+    round: { id: String(previous._id), number: previous.number, status: previous.status },
+    ranking: await rankingForRound(previous),
+  };
+}
+
+module.exports = { processRoundScoring, getRanking, getPreviousRanking, pickPreviousRound, POINTS, scoreFinishedRounds };

@@ -54,7 +54,15 @@ export async function request(path, { method = "GET", body, headers = {} } = {})
   if (body !== undefined) opts.body = JSON.stringify(body);
   const token = getSessionToken();
   if (token) opts.headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(API.baseURL + path, opts);
+  let res;
+  try {
+    res = await fetch(API.baseURL + path, opts);
+  } catch (e) {
+    // Sem rede ou servidor fora do ar: mensagem para o usuário, sem jargão técnico.
+    const offline = new Error("Não foi possível falar com o servidor. Verifique sua conexão e tente novamente.");
+    offline.userFacing = true;
+    throw offline;
+  }
   // Sessao invalida/expirada ou token de outro backend: limpa e volta ao login.
   if (res.status === 401 && !path.startsWith("/auth/")) {
     try {
@@ -67,8 +75,16 @@ export async function request(path, { method = "GET", body, headers = {} } = {})
   }
   if (!res.ok) {
     let msg = `Erro ${res.status}`;
-    try { const j = await res.json(); msg = j.message || msg; } catch (e) { /* noop */ }
-    throw new Error(msg);
+    let fromBackend = false;
+    try {
+      const j = await res.json();
+      if (j && j.message) { msg = j.message; fromBackend = true; }
+    } catch (e) { /* noop */ }
+    const err = new Error(msg);
+    // Só mensagem curada pelo backend pode aparecer na tela; "Erro 500" não.
+    err.userFacing = fromBackend;
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
@@ -84,7 +100,9 @@ export function getSessionToken() {
  * Rejeita a operação com erro padrão — a UI traduz em estado de erro.
  */
 export function operationPending(resource) {
-  return Promise.reject(new Error(`Não foi possível concluir: ${resource}. Tente novamente.`));
+  const err = new Error(`Não foi possível concluir: ${resource}. Tente novamente.`);
+  err.userFacing = true;
+  return Promise.reject(err);
 }
 
 /** Sem atrasos artificiais: a UI deve responder imediatamente ao backend. */

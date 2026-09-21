@@ -42,8 +42,17 @@ export async function render(view) {
       const message = closed
         ? "Os palpites desta rodada estão encerrados. Seus tickets e a pontuação ficam no histórico."
         : "Cada ticket vale para uma rodada: compre um ticket desta rodada para palpitar.";
-      pickerHost.replaceChildren(stateNode("empty", { title, message }));
-      pickerHost.insertAdjacentHTML("afterend", `<div class="state" style="padding:var(--space-5)"><a class="btn btn-primary btn-lg" href="#/buy">Comprar tickets</a> <a class="btn btn-ghost btn-lg" href="#/history">Ver histórico</a></div>`);
+      // Atalhos DENTRO do host: antes eram inseridos como irmão ("afterend"), o que
+      // estourava "The element has no parent" quando a página era trocada no meio do
+      // carregamento.
+      const empty = document.createElement("div");
+      empty.appendChild(stateNode("empty", { title, message }));
+      const actions = document.createElement("div");
+      actions.className = "state";
+      actions.style.padding = "var(--space-5)";
+      actions.innerHTML = `<a class="btn btn-primary btn-lg" href="#/buy">Comprar tickets</a> <a class="btn btn-ghost btn-lg" href="#/history">Ver histórico</a>`;
+      empty.appendChild(actions);
+      pickerHost.replaceChildren(empty);
       return;
     }
 

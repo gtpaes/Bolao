@@ -19,11 +19,12 @@ export async function render(view) {
   await loadTemplate(view, "tickets.html");
   await run(view, async () => {
     const tabs = view.querySelector("#ticket-tabs");
+    // "Pontuados" saiu: o ticket nunca recebe o status "scored" (o fechamento já o
+    // marca como "closed" antes de pontuar), então o filtro nunca casava.
     const statuses = [
       ["all", "Todos"],
       ["released", "Liberados"],
       ["closed", "Encerrados"],
-      ["scored", "Pontuados"],
     ];
     tabs.innerHTML = statuses.map(([k, l]) => `<button class="tab ${k === "all" ? "active" : ""}" data-s="${k}">${l}</button>`).join("");
 
@@ -31,30 +32,50 @@ export async function render(view) {
     try { data = await listTickets(); } catch (e) { data = { tickets: [], round: null }; }
     const tickets = data.tickets || [];
     const listHost = view.querySelector('[data-host="tickets"]');
+    if (!listHost) return; // estrutura inesperada: melhor sair do que estourar na tela
 
     // Cada ticket vale para UMA rodada: aqui aparecem só os da rodada corrente.
     // Os tickets das rodadas anteriores ficam no histórico (com palpites e pontos).
     listHost.insertAdjacentHTML("beforebegin",
       `<p class="t-muted t-small">${data.round ? `Tickets da <b>rodada ${esc(String(data.round.number))}</b>.` : "Nenhuma rodada corrente."} Os tickets de rodadas anteriores ficam no <a href="#/history">histórico</a>.</p>`);
 
-    if (!tickets.length) {
-      listHost.replaceChildren(stateNode("empty", {
-        title: data.round ? `Sem tickets na rodada ${data.round.number}` : "Você ainda não tem tickets",
-        message: "Cada ticket participa de uma rodada: compre um ticket desta rodada para palpitar.",
-      }));
-      listHost.insertAdjacentHTML("afterend", `<div class="state" style="padding:var(--space-5)"><a class="btn btn-primary btn-lg" href="#/buy">Comprar tickets</a> <a class="btn btn-ghost btn-lg" href="#/history">Ver histórico</a></div>`);
-      return;
-    }
+    // Estado vazio com os atalhos DENTRO do mesmo nó, que é substituído a cada
+    // render: antes os botões entravam como irmãos do host e se acumulavam.
+    const showEmpty = ({ title, message, actions = false }) => {
+      const wrap = document.createElement("div");
+      wrap.appendChild(stateNode("empty", { title, message }));
+      if (actions) {
+        const bar = document.createElement("div");
+        bar.className = "state";
+        bar.style.padding = "var(--space-5)";
+        bar.innerHTML = `<a class="btn btn-primary btn-lg" href="#/buy">Comprar tickets</a> <a class="btn btn-ghost btn-lg" href="#/history">Ver histórico</a>`;
+        wrap.appendChild(bar);
+      }
+      listHost.replaceChildren(wrap);
+    };
 
     const renderList = (filter) => {
+      if (!tickets.length) {
+        showEmpty({
+          title: data.round ? `Sem tickets na rodada ${data.round.number}` : "Você ainda não tem tickets",
+          message: "Cada ticket participa de uma rodada: compre um ticket desta rodada para palpitar.",
+          actions: true,
+        });
+        return;
+      }
       const list = filter === "all" ? tickets : tickets.filter((t) => t.status === filter);
-      if (!list.length) { listHost.replaceChildren(stateNode("empty", { title: "Sem tickets neste status", message: "" })); return; }
+      if (!list.length) {
+        showEmpty({ title: "Nenhum ticket neste status", message: "Troque o filtro ou veja todos os tickets." });
+        return;
+      }
       const wrap = document.createElement("div");
       wrap.className = "grid";
       wrap.replaceChildren(...list.map(ticketCard));
       listHost.replaceChildren(wrap);
     };
 
+    // As abas são ligadas SEMPRE: antes o `return` do caso "sem tickets" pulava esta
+    // parte e os botões ficavam inertes (só "Todos" parecia ativo, por já vir marcado).
     tabs.querySelectorAll("[data-s]").forEach((btn) => btn.addEventListener("click", () => {
       tabs.querySelectorAll("[data-s]").forEach((b) => b.classList.toggle("active", b === btn));
       renderList(btn.dataset.s);

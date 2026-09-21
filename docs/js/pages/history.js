@@ -12,7 +12,10 @@ export async function render(view) {
     const roundFilter = view.querySelector("#f-round-data");
     const statusFilter = view.querySelector("#f-status-data");
     const periodFilter = view.querySelector("#f-period-data");
-    statusFilter.innerHTML = `<option value="all">Todos os status</option><option value="released">Em andamento</option><option value="closed">Encerrados</option><option value="scored">Pontuados</option>`;
+    // "Pontuados" saiu: o ticket nunca recebe o status "scored" (o fechamento já o
+    // marca como "closed" antes de pontuar), então o filtro nunca casava. Os
+    // tickets de rodada encerrada — com ou sem pontos — aparecem em "Encerrados".
+    statusFilter.innerHTML = `<option value="all">Todos os status</option><option value="released">Em andamento</option><option value="closed">Encerrados</option>`;
     periodFilter.innerHTML = `<option value="all">Todo o período</option>`;
 
     const load = async () => {

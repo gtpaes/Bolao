@@ -2,23 +2,48 @@
 <div class="page-head">
   <div>
     <h1 class="page-title">Ranking</h1>
-    <p class="page-sub">Posições da rodada.</p>
+    <p class="page-sub">Posições da rodada atual e da rodada anterior.</p>
   </div>
 </div>
 
 <div class="card" style="margin-bottom:var(--space-5)" data-host="my-position"></div>
-<div class="card card-flush">
+
+<div class="card card-flush" style="margin-bottom:var(--space-5)">
+  <div class="card-header">
+    <h2 class="card-title"><i data-lucide="list-ordered"></i> <span data-host="current-round-label">Rodada atual</span></h2>
+  </div>
   <div class="table-wrap">
     <table class="table" id="ranking-table">
       <thead>
         <tr>
           <th scope="col">Posição</th>
           <th scope="col">Usuário</th>
-          <th scope="col">Ticket</th>
+          <th scope="col" class="col-ticket">Ticket</th>
           <th scope="col">Pontos</th>
         </tr>
       </thead>
       <tbody id="ranking-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Rodada anterior: aparece só quando existe uma rodada anterior com apostas -->
+<div class="card card-flush" id="previous-round-card" hidden>
+  <div class="card-header">
+    <h2 class="card-title"><i data-lucide="history"></i> Rodada anterior <span class="badge badge-gray" data-host="previous-round-label">—</span></h2>
+    <span class="t-muted t-small" data-host="previous-my-position"></span>
+  </div>
+  <div class="table-wrap">
+    <table class="table" id="previous-ranking-table">
+      <thead>
+        <tr>
+          <th scope="col">Posição</th>
+          <th scope="col">Usuário</th>
+          <th scope="col" class="col-ticket">Ticket</th>
+          <th scope="col">Pontos</th>
+        </tr>
+      </thead>
+      <tbody id="previous-ranking-body"></tbody>
     </table>
   </div>
 </div>
