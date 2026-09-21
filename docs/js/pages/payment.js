@@ -13,7 +13,8 @@ let stopPolling = null;
 export async function render(view) {
   // Voltando para esta tela, o poller anterior vira lixo: continuaria batendo na API
   // e escrevendo num host já descartado.
-  if (stopPolling) { stopPolling(); stopPolling = null; }
+  if (typeof stopPolling === "function") { stopPolling(); }
+  stopPolling = null;
   await loadTemplate(view, "payment.html");
   await run(view, async () => {
     const order = get("pendingOrder", { qty: 1, unitPrice: 10, total: 10 });
@@ -116,7 +117,7 @@ function renderPixPaymentState(resultHost, payment, order, view, chip) {
     try {
       await cancelPayment(payment.id);
       remove("pendingOrder");
-      if (stopPolling) stopPolling();
+      if (typeof stopPolling === "function") stopPolling();
       toastSuccess("Compra cancelada", "A cobrança Pix foi cancelada.");
       window.location.hash = "#/buy";
     } catch (e) {
@@ -125,7 +126,11 @@ function renderPixPaymentState(resultHost, payment, order, view, chip) {
   });
 }
 
-async function startPaymentPolling(view, paymentId, chip, resultHost) {
+// A função devolve o "stop" do polling. Ela NÃO pode ser `async`: uma função
+// async devolve Promise, e o valor guardado em `stopPolling` deixa de ser
+// chamável — era daí que vinha o "stopPolling is not a function" mostrado ao
+// cancelar a compra (o cancelamento em si já tinha dado certo no servidor).
+function startPaymentPolling(view, paymentId, chip, resultHost) {
   let attempts = 0;
   const maxAttempts = 36;
   let timer = null;
