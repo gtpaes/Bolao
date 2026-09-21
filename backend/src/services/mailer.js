@@ -31,22 +31,25 @@ async function sendEmail({ to, toName, subject, html }) {
     });
     const raw = await response.text();
     if (!response.ok) {
-      // 401 (chave inválida) e 400 (remetente não validado) são os casos comuns.
-      logger.error({ status: response.status, body: raw.slice(0, 500) }, "brevo recusou o e-mail");
+      // Casos comuns: 401 (chave inválida), 400 (remetente não validado) e
+      // 404 (URL errada). A URL entra no log para o diagnóstico ser imediato.
+      logger.error({ status: response.status, url: config.brevo.apiUrl, body: raw.slice(0, 500) }, "brevo recusou o e-mail");
       throw emailError();
     }
     logger.info({ to, messageId: messageIdOf(raw) }, "e-mail transacional enviado (brevo)");
   } catch (e) {
     if (e && e.code === "EMAIL_ERROR") throw e;
-    logger.error({ err: String(e && e.message) }, "falha ao enviar e-mail pelo brevo");
+    logger.error({ err: String(e && e.message), url: config.brevo.apiUrl }, "falha ao enviar e-mail pelo brevo");
     throw emailError();
   } finally {
     clearTimeout(timer);
   }
 }
 
+// 502 é o "serviço de e-mail falhou": o detalhe técnico fica SÓ no log (acima),
+// nunca na resposta. A mensagem diz o que o usuário pode fazer.
 function emailError() {
-  const err = new Error("Não foi possível enviar o e-mail de recuperação.");
+  const err = new Error("Não foi possível enviar o e-mail de recuperação agora. Tente novamente em alguns minutos.");
   err.status = 502;
   err.code = "EMAIL_ERROR";
   return err;

@@ -1,5 +1,7 @@
 require("dotenv").config();
 
+const { unquote, normalizeBrevoUrl } = require("../utils/brevo");
+
 function num(name, fallback) {
   const v = Number(process.env[name]);
   return Number.isFinite(v) && v > 0 ? v : fallback;
@@ -29,9 +31,11 @@ const config = {
   // BREVO_API_URL sem alterar o código.
   brevo: {
     apiKey: secret("BREVO_API_KEY"),
-    fromEmail: String(process.env.BREVO_FROM_EMAIL || "").trim(),
-    fromName: process.env.BREVO_FROM_NAME || "Bolão",
-    apiUrl: process.env.BREVO_API_URL || "https://api.brevo.com/v3/smtp/email",
+    // fromEmail/fromName/apiUrl passam pela normalização: aspas e barra final
+    // coladas do painel de variáveis quebravam o envio (o Brevo recusava).
+    fromEmail: unquote(process.env.BREVO_FROM_EMAIL),
+    fromName: unquote(process.env.BREVO_FROM_NAME) || "Bolão",
+    apiUrl: normalizeBrevoUrl(process.env.BREVO_API_URL),
     timeoutMs: num("BREVO_TIMEOUT_MS", 10000),
   },
   // Dominio(s) permitido(s) pelo CORS.
