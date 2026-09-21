@@ -1,0 +1,4 @@
+# Testes automatizados do backend ficam apenas na máquina local.
+# Foram removidos do repositório de propósito: não devem ser versionados
+# nem reintroduzidos por engano em commits futuros.
+backend/tests/
