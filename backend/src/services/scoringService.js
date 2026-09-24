@@ -85,7 +85,7 @@ async function rankingForRound(round) {
       ticket_id: String(t._id),
       ticket_number: t.number,
       user_id: String(t.userId && t.userId._id ? t.userId._id : t.userId),
-      username: (t.userId && t.userId.username) || "Usuário",
+      username: (t.userId && t.userId.username) || (t.ownerName && t.ownerName.trim()) || "Usuário",
       points: Number(t.points) || 0,
     }))
     .sort((a, b) => b.points - a.points || a.username.localeCompare(b.username) || a.ticket_number - b.ticket_number)

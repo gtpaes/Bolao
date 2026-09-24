@@ -180,7 +180,7 @@ async function listPublicPicks(roundId, ticketId) {
     byTicket.set(String(ticket._id), {
       ticket_id: String(ticket._id),
       ticket_number: ticket.number,
-      username: ticket.userId && ticket.userId.username ? ticket.userId.username : "Usuário",
+      username: ticket.userId && ticket.userId.username ? ticket.userId.username : (ticket.ownerName && ticket.ownerName.trim()) || "Usuário",
       points: Number(ticket.points) || 0,
       picks: [],
     });

@@ -2,14 +2,19 @@
 <div class="page-head">
   <div>
     <h1 class="page-title">Gerenciar Tickets</h1>
-    <p class="page-sub">Tickets vendidos e seu status de pagamento.</p>
+    <p class="page-sub">Tickets vendidos, venda em mão e resultados da rodada.</p>
   </div>
+  <button class="btn btn-primary" id="admin-ticket-manual"><i data-lucide="plus"></i> Cadastrar venda em mão</button>
 </div>
+
+<div data-host="tickets-round"></div>
+
+<div data-host="tickets-results"></div>
 
 <div class="card card-flush">
   <div class="table-wrap">
     <table class="table">
-      <thead><tr><th scope="col">Ticket</th><th scope="col">Usuário</th><th scope="col">Rodada</th><th scope="col">Status</th><th scope="col">Pontos</th></tr></thead>
+      <thead><tr><th scope="col">Ticket</th><th scope="col">Titular</th><th scope="col">Rodada</th><th scope="col">Preço</th><th scope="col">Forma</th><th scope="col">Status</th><th scope="col">Pontos</th></tr></thead>
       <tbody id="admin-tickets-body"></tbody>
     </table>
   </div>

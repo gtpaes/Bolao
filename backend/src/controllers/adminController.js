@@ -3,10 +3,12 @@ const Ticket = require("../models/Ticket");
 const User = require("../models/User");
 const Payment = require("../models/Payment");
 const settingsService = require("../services/settingsService");
+const manualTicketService = require("../services/manualTicketService");
 const { syncRound, reconcilePendingRounds } = require("../integrations/football/sync");
 const { scoreFinishedRounds } = require("../services/scoringService");
 const { closeRound: closeRoundService, reopenRound: reopenRoundService, setAutomatic, closesAt } = require("../services/roundLifecycle");
 const { badRequest, notFound } = require("../utils/errors");
+const { Types } = require("mongoose");
 
 async function overview(req, res, next) {
   try {
@@ -144,18 +146,46 @@ async function listUsers(req, res, next) {
 
 async function listTickets(req, res, next) {
   try {
-    const tickets = await Ticket.find({}).sort({ createdAt: -1 }).limit(200).populate("userId", "username").populate("roundId", "number").lean();
+    let query = {};
+    const roundId = req.query.round;
+    if (roundId && roundId !== "all") {
+      if (!Types.ObjectId.isValid(String(roundId))) throw badRequest("Rodada inválida.");
+      query.roundId = roundId;
+    }
+    const tickets = await Ticket.find(query).sort({ createdAt: -1 }).limit(200).populate("userId", "username").populate("roundId", "number").lean();
     return res.json({
       tickets: tickets.map((t) => ({
         id: String(t._id),
         number: t.number,
-        user: t.userId && t.userId.username ? t.userId.username : "—",
+        user: t.userId && t.userId.username ? t.userId.username : null,
+        owner: (t.ownerName && t.ownerName.trim()) || (t.userId && t.userId.username) || "—",
         round: t.roundId && t.roundId.number,
+        roundId: t.roundId && String(t.roundId._id),
         status: t.status,
         points: t.points || 0,
+        priceCents: t.unitPriceCents || 0,
+        paymentMethod: t.paymentMethod || "pix",
         createdAt: t.createdAt,
       })),
     });
+  } catch (e) { return next(e); }
+}
+
+// Venda em mão (sem Pix): pago aprovado direto ao financeiro + ticket liberado.
+async function createManualTicket(req, res, next) {
+  try {
+    const { roundId, name, number, userId } = req.body || {};
+    const data = await manualTicketService.createManualTicket({ roundId, name, number, userId });
+    return res.status(201).json(data);
+  } catch (e) { return next(e); }
+}
+
+// Lança o resultado de um jogo e repontua a rodada na hora.
+async function setMatchScore(req, res, next) {
+  try {
+    const { home, away } = req.body || {};
+    const data = await manualTicketService.setMatchScore(req.params.id, req.params.matchId, home, away);
+    return res.json(data);
   } catch (e) { return next(e); }
 }
 
@@ -185,4 +215,4 @@ async function updateSettings(req, res, next) {
   catch (e) { return next(e); }
 }
 
-module.exports = { overview, setDeadline, closeRound, reopenRound, setRoundAutomatic, syncNow, setRoundMatches, addMatch, listUsers, listTickets, setUserRole, getSettings, updateSettings };
+module.exports = { overview, setDeadline, closeRound, reopenRound, setRoundAutomatic, syncNow, setRoundMatches, addMatch, listUsers, listTickets, createManualTicket, setMatchScore, setUserRole, getSettings, updateSettings };

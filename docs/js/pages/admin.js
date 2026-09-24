@@ -281,12 +281,134 @@ export async function adminTickets(view) {
   await loadTemplate(view, "admin/tickets.html");
   await run(view, async () => {
     const body = view.querySelector("#admin-tickets-body");
-    try {
-      const data = await request("/admin/tickets");
-      const tickets = data.tickets || [];
-      if (!tickets.length) { body.innerHTML = `<tr><td colspan="5">${emptyRowCell("Nenhum ticket encontrado.")}</td></tr>`; return; }
-      body.innerHTML = tickets.map((ticket) => `<tr><td>Ticket ${esc(String(ticket.number))}</td><td>${esc(ticket.user)}</td><td>${esc(String(ticket.round || "—"))}</td><td>${esc(ticket.status)}</td><td>${esc(String(ticket.points || 0))}</td></tr>`).join("");
-    } catch (e) { body.innerHTML = `<tr><td colspan="5">${emptyRowCell(e.message || "Não foi possível carregar os tickets.")}</td></tr>`; }
+    const roundHost = view.querySelector('[data-host="tickets-round"]');
+    const resultsHost = view.querySelector('[data-host="tickets-results"]');
+
+    let rounds = [];
+    try { rounds = (await listRounds()).rounds || []; } catch (e) { rounds = []; }
+
+    // Seletor de rodada (filtra a lista e é o alvo dos resultados).
+    const selWrap = document.createElement("div");
+    selWrap.className = "card";
+    selWrap.innerHTML = `<div class="card-header"><h2 class="card-title"><i data-lucide="calendar-clock"></i> Rodada</h2></div>
+      <div class="card-body">
+        ${rounds.length
+          ? `<select class="input" id="admin-ticket-round-select"></select>`
+          : stateNode("empty", { title: "Sem rodadas", message: "Sincronize uma rodada antes de administrar tickets." }).innerHTML}
+      </div>`;
+    const select = selWrap.querySelector("#admin-ticket-round-select");
+    if (select) {
+      select.innerHTML = rounds.map((r) => `<option value="${esc(r.id)}">Rodada ${esc(String(r.number))}${r.status ? ` — ${esc(r.status)}` : ""}</option>`).join("");
+    }
+    roundHost.replaceChildren(selWrap);
+    if (window.lucide) window.lucide.createIcons({ nodes: [selWrap] });
+
+    async function reloadTickets() {
+      body.innerHTML = `<tr><td colspan="7"><div class="state" style="padding:var(--space-4)"><span class="state-ico muted"><i data-lucide="loader-circle"></i></span><h3>Carregando</h3></div></td></tr>`;
+      const rid = select ? select.value : null;
+      try {
+        const url = rid ? `/admin/tickets?round=${rid}` : "/admin/tickets";
+        const data = await request(url);
+        const tickets = data.tickets || [];
+        if (!tickets.length) { body.innerHTML = `<tr><td colspan="7">${emptyRowCell(rid ? "Nenhum ticket nesta rodada." : "Nenhum ticket encontrado.")}</td></tr>`; return; }
+        body.innerHTML = tickets.map((ticket) => {
+          const forma = ticket.paymentMethod === "manual" ? "Em mão" : "Pix";
+          const titular = `<span>${esc(ticket.owner || "—")}</span>${ticket.user ? "" : ' <span class="badge">sem conta</span>'}`;
+          const preco = ticket.priceCents ? brl(ticket.priceCents / 100) : "—";
+          return `<tr>
+            <td>Ticket ${esc(String(ticket.number))}</td>
+            <td>${titular}</td>
+            <td>${esc(String(ticket.round || "—"))}</td>
+            <td>${esc(preco)}</td>
+            <td>${esc(forma)}</td>
+            <td>${esc(ticket.status)}</td>
+            <td>${esc(String(ticket.points || 0))}</td>
+          </tr>`;
+        }).join("");
+      } catch (e) {
+        body.innerHTML = `<tr><td colspan="7">${emptyRowCell(e.message || "Não foi possível carregar os tickets.")}</td></tr>`;
+      }
+    }
+
+    async function reloadResults() {
+      const rid = select ? select.value : null;
+      if (!rid) { resultsHost.replaceChildren(); return; }
+      resultsHost.replaceChildren(stateNode("off", { title: "Resultados", message: "Carregando resultados…" }));
+      try {
+        const data = await request(`/admin/rounds/${rid}/matches`);
+        const matches = data.matches || [];
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<div class="card-header"><h2 class="card-title"><i data-lucide="goal"></i> Resultados da rodada</h2></div>
+          <div class="card-body">
+            <p class="t-muted t-small">Marca o placar de cada jogo. Um jogo com placar é encerrado e reponta ao instante.</p>
+            <div data-match-rows></div>
+            <button class="btn btn-primary" data-save-results><i data-lucide="save"></i> Salvar resultados</button>
+          </div>`;
+        const rows = card.querySelector("[data-match-rows]");
+        if (!matches.length) {
+          rows.appendChild(stateNode("empty", { title: "Sem jogos", message: "Não há jogos nesta rodada." }));
+        } else {
+          matches.forEach((m) => {
+            const row = document.createElement("div");
+            row.className = "field";
+            row.style.display = "flex";
+            row.style.alignItems = "center";
+            row.style.gap = "var(--space-3)";
+            row.style.flexWrap = "wrap";
+            row.innerHTML = `
+              <span style="min-width:150px"><b>${esc(m.home || "Local")}</b><span class="t-muted"> x </span><b>${esc(m.away || "Visitante")}</b></span>
+              <input class="input" type="number" data-home="${esc(m.externalId)}" placeholder="Local" min="0" max="99" value="${m.home_score ?? ""}">
+              <input class="input" type="number" data-away="${esc(m.externalId)}" placeholder="Visitante" min="0" max="99" value="${m.away_score ?? ""}">
+              <span class="badge">${esc(m.status || "")}</span>`;
+            rows.appendChild(row);
+          });
+        }
+        resultsHost.replaceChildren(card);
+        if (window.lucide) window.lucide.createIcons({ nodes: [card] });
+        card.querySelector("[data-save-results]").addEventListener("click", async (ev) => {
+          const btn = ev.currentTarget;
+          btn.disabled = true;
+          try {
+            let saved = 0;
+            for (const m of matches) {
+              const homeEl = rows.querySelector(`[data-home="${m.externalId}"]`);
+              const awayEl = rows.querySelector(`[data-away="${m.externalId}"]`);
+              if (!homeEl || !awayEl) continue;
+              if (homeEl.value === "" && awayEl.value === "") continue;
+              await request(`/admin/rounds/${rid}/matches/${m.externalId}/score`, { method: "POST", body: { home: homeEl.value, away: awayEl.value } });
+              saved++;
+            }
+            if (!saved) { toastInfo("Nada para salvar", "Preenche o placar dos jogos."); return; }
+            toastSuccess("Resultados salvos", `${saved} jogo(s) atualizados e repuntuados.`);
+            await reloadResults();
+            await reloadTickets();
+          } catch (e) {
+            toastError("Não foi possível salvar", e.message || "Revisa o resultado.");
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      } catch (e) {
+        resultsHost.replaceChildren(stateNode("error", { title: "Não foi possível carregar os resultados", message: e.message || "Tente novamente." }));
+      }
+    }
+
+    view.querySelector("#admin-ticket-manual").addEventListener("click", async () => {
+      if (!rounds.length) return toastError("Sem rodadas", "Sincronize uma rodada antes.");
+      await openManualSaleModal({
+        rounds,
+        defaultRoundId: select ? select.value : null,
+        onCreated: async () => { await reloadTickets(); await reloadResults(); },
+      });
+    });
+
+    if (select) {
+      select.addEventListener("change", async () => { await reloadTickets(); await reloadResults(); });
+    }
+
+    await reloadTickets();
+    await reloadResults();
   });
 }
 
@@ -333,4 +455,66 @@ function statCard(s) {
 }
 function emptyRowCell(msg) {
   return `<div class="state" style="padding:var(--space-6)"><span class="state-ico muted"><i data-lucide="database"></i></span><h3>Sem dados</h3><p>${esc(msg)}</p></div>`;
+}
+
+/* Modal de venda em mão (dinheiro, sem Pix): nome/número + titular opcional. */
+async function openManualSaleModal({ rounds, defaultRoundId, onCreated }) {
+  let users = [];
+  try { users = (await request("/admin/users")).users || []; } catch (e) { users = []; }
+  let priceCents = 1000;
+  try {
+    const settings = (await request("/admin/settings")).settings || {};
+    if (Number(settings.priceCents) > 0) priceCents = Number(settings.priceCents);
+  } catch (e) { /* usa o padrão */ }
+
+  const roundOpts = rounds.map((r) => `<option value="${esc(r.id)}" ${String(r.id) === String(defaultRoundId) ? "selected" : ""}>Rodada ${esc(String(r.number))}${r.status ? ` — ${esc(r.status)}` : ""}</option>`).join("");
+  const userOpts = users.map((u) => `<option value="${esc(String(u.id))}">${esc(u.username)}</option>`).join("");
+
+  const body = document.createElement("div");
+  body.innerHTML = `
+    <div class="field"><label for="mt-round">Rodada</label><select class="input" id="mt-round">${roundOpts}</select></div>
+    <div class="field"><label for="mt-user">Usuário (opcional)</label><select class="input" id="mt-user"><option value="">— Comprador sem conta —</option>${userOpts}</select></div>
+    <div class="field"><label for="mt-name">Nome do titular</label><input class="input" id="mt-name" placeholder="Nome e sobrenome" /></div>
+    <div class="field"><label for="mt-number">Nº do ticket (opcional)</label><input class="input" id="mt-number" type="number" min="1" placeholder="Automático" /></div>
+    <p class="t-muted t-small">Preço: <b>${esc(brl(priceCents / 100))}</b> · vai direto ao financeiro como pago em mão.</p>`;
+
+  const userSel = body.querySelector("#mt-user");
+  const nameEl = body.querySelector("#mt-name");
+  if (userSel && nameEl) {
+    userSel.addEventListener("change", () => {
+      const u = users.find((x) => String(x.id) === userSel.value);
+      if (u) nameEl.placeholder = u.username;
+    });
+  }
+
+  const modal = openModal({
+    title: "Cadastrar venda em mão",
+    body,
+    footer: `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" data-save-manual>Salvar venda</button>`,
+  });
+
+  modal.overlay.querySelector("[data-close]").addEventListener("click", () => modal.close());
+  modal.overlay.querySelector("[data-save-manual]").addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    const roundId = body.querySelector("#mt-round").value;
+    const userId = body.querySelector("#mt-user").value || null;
+    const name = body.querySelector("#mt-name").value.trim();
+    const rawNumber = body.querySelector("#mt-number").value.trim();
+    if (!roundId) { toastError("Falta a rodada", "Escolha uma rodada."); btn.disabled = false; return; }
+    try {
+      const res = await request("/admin/tickets/manual", {
+        method: "POST",
+        body: { roundId, userId, name, number: rawNumber === "" ? null : Number(rawNumber) },
+      });
+      const t = (res && res.ticket) || {};
+      toastSuccess("Venda registrada", `Ticket ${t.number || ""} de ${t.owner || name || "—"} (${brl((t.priceCents || priceCents) / 100)}).`);
+      modal.close();
+      if (onCreated) await onCreated(t);
+    } catch (e) {
+      toastError("Não foi possível salvar", e.message || "Tente novamente.");
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }

@@ -2,7 +2,8 @@ const { Schema, model, Types } = require("mongoose");
 
 const paymentSchema = new Schema(
   {
-    userId: { type: Types.ObjectId, ref: "User", required: true, index: true },
+    // Opcional: a venda "em mão" (dinheiro, sem Pix) pode não ter conta.
+    userId: { type: Types.ObjectId, ref: "User", required: false, default: null, index: true },
     roundId: { type: Types.ObjectId, ref: "Round", required: true, index: true },
     quantity: { type: Number, required: true, min: 1, max: 100 },
     ticketIds: [{ type: Types.ObjectId, ref: "Ticket" }],
@@ -24,6 +25,8 @@ const paymentSchema = new Schema(
     idempotencyKey: { type: String, required: true, unique: true },
     webhookEventId: { type: String, default: undefined, index: { unique: true, sparse: true } },
     expiresAt: { type: Date, default: null, index: true },
+    // Observação livre (usado nas vendas em mão para registrar o titular, etc.).
+    note: { type: String, trim: true, default: "" },
   },
   { timestamps: { createdAt: true, updatedAt: true } }
 );
