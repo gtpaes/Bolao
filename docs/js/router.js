@@ -28,8 +28,11 @@ const ROUTES = [
 ];
 
 export async function initRouter() {
-  render();
+  const firstRender = render();
   window.addEventListener("hashchange", render);
+  // Devolve a promise da primeira renderização para o app.js poder esconder o
+  // overlay de carregamento assim que o conteúdo inicial for pintado.
+  return firstRender;
 }
 
 export function navigate(path) {

@@ -355,6 +355,107 @@
 /* ---------- Kbd (dev/monitor) ---------- */
 .kbd { display: inline-block; padding: 1px 7px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border-2); border-bottom-width: 2px; font-family: var(--font-mono); font-size: .8rem; }
 
+/* ---------- Overlay de loading na entrada do app ("bola no gol") ----------
+   Exibido APENAS no carregamento inicial (após o login, ao abrir o dashboard),
+   ligado pelo app.js. Fundo SÓLIDO: branco no modo claro, preto no escuro —
+   nunca transparente (sem blur/opacidade). Cores da animação definidas por
+   tema através de variáveis próprias (não dependem de --surface/--ink). */
+.load-overlay {
+  /* Modo claro: fundo branco, bola branca com contorno/painéis verdes, gol verde-escuro. */
+  --load-bg: #ffffff;
+  --load-ball: #ffffff;
+  --load-ball-line: #0f8a45;
+  --load-ball-panel: #0f8a45;
+  --load-goal: #065a2e;
+  --load-net: rgba(6, 90, 46, 0.5);
+  --load-field: #0f8a45;
+  --load-pitch-line: #2fbf76;
+  --load-label: #5b6b62;
+
+  position: fixed;
+  inset: 0;
+  z-index: 80; /* acima de drawer (65), modal (66) e toasts (70) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--load-bg);
+  visibility: hidden;
+}
+:root[data-theme="dark"] .load-overlay {
+  /* Modo escuro: fundo preto, bola BRANCA com painéis pretos (bem visível), gol branco. */
+  --load-bg: #000000;
+  --load-ball: #ffffff;
+  --load-ball-line: #0e1712;
+  --load-ball-panel: #0e1712;
+  --load-goal: #ffffff;
+  --load-net: rgba(255, 255, 255, 0.5);
+  --load-field: #065a2e;
+  --load-pitch-line: #0a6e38;
+  --load-label: #a0b1a6;
+}
+.load-overlay--show { visibility: visible; }
+
+.load-overlay__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 220px;
+  padding: var(--space-7) var(--space-7) var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.load-goal svg { width: 200px; height: auto; max-width: 100%; }
+.load-goal .g-pitch { fill: var(--load-field, var(--green-600)); }
+.load-goal .g-pitch-line { fill: var(--load-pitch-line, var(--green-50)); }
+.load-goal .g-goal { fill: none; }
+.load-goal .g-goal path { stroke: var(--load-goal, var(--surface)); }
+.load-goal .g-net { stroke: var(--load-net, var(--muted)); }
+.load-goal .g-ball circle.face {
+  fill: var(--load-ball, var(--surface));
+  stroke: var(--load-ball-line, var(--ink));
+  stroke-width: 2;
+}
+.load-goal .g-ball path.panel,
+.load-goal .g-ball circle.panel { fill: var(--load-ball-panel, var(--ink)); }
+
+/* Bola: é impulsionada da esquerda, quica no chão e entra no gol; depois a
+   cena reinicia. Laço tranquilo de ~1.9s. */
+.g-ball { animation: goal-shot 1.9s ease-in-out infinite; }
+@keyframes goal-shot {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  6%   { opacity: 1; }
+  14%  { transform: translate(28px, -16px); }
+  24%  { transform: translate(52px, 0); }
+  34%  { transform: translate(78px, -12px); }
+  44%  { transform: translate(102px, 0); }
+  54%  { transform: translate(126px, -8px); }
+  66%  { transform: translate(142px, 0); } /* cruza a linha do gol */
+  80%  { transform: translate(150px, -3px); }
+  92%  { transform: translate(152px, 2px); opacity: 1; }
+  100% { transform: translate(152px, 2px); opacity: 0; }
+}
+/* A rede "estremece" de leve quando a bola entra. */
+.g-net { transform-origin: 166px 56px; }
+.load-goal { transform-origin: center; }
+.load-overlay--show .g-net { animation: net-shake 1.9s ease-in-out infinite; }
+@keyframes net-shake {
+  0%, 60%, 100% { transform: scale(1); }
+  74%, 80% { transform: scale(1.04, 0.96); }
+}
+
+.load-label {
+  margin: 0;
+  color: var(--load-label, var(--muted));
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: .02em;
+}
+
 /* ---------- Grid helpers ---------- */
 .grid { display: grid; gap: var(--space-4); }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }

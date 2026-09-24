@@ -9,9 +9,14 @@ import { initials } from "../utils/format.js";
 import { openModal } from "../components/modal.js";
 import { confirmDialog } from "../components/confirm.js";
 import { toastSuccess, toastInfo } from "../components/toast.js";
+import { showLoading, hideLoading } from "../components/loading.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (!requireAuth()) return;
+
+  // Esconde o shell (ainda sem conteúdo) enquanto o perfil e a primeira tela
+  // carregam. O overlay em si (animação da bola no gol) vem do components/loading.js.
+  showLoading({ immediate: true });
   try { await refreshProfile(); } catch (e) { /* sessão local continua útil se a API estiver temporariamente indisponível */ }
   initTheme();
 
@@ -54,7 +59,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Iniciar router
-  initRouter();
+  await initRouter();
+
+  // Primeira tela pintada: esconde o overlay de carregamento inicial.
+  hideLoading();
 });
 
 function hydrateUserChips(profile, role) {
