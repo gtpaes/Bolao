@@ -1,6 +1,5 @@
 const Ticket = require("../models/Ticket");
 const Round = require("../models/Round");
-const Pick = require("../models/Pick");
 const { Types } = require("mongoose");
 const { isRoundOpenForPicks } = require("./roundLifecycle");
 const { badRequest, forbidden, notFound, paymentRequired } = require("../utils/errors");
@@ -120,18 +119,6 @@ async function savePicks(userId, ticketId, picks) {
   }
   ticket.picks = normalized;
   await ticket.save();
-  await Pick.deleteMany({ ticketId: ticket._id });
-  if (normalized.length) {
-    await Pick.insertMany(normalized.map((pick) => ({
-      ticketId: ticket._id,
-      userId: ticket.userId,
-      roundId: ticket.roundId,
-      matchExternalId: pick.matchExternalId,
-      home: pick.home,
-      away: pick.away,
-      points: 0,
-    })), { ordered: true });
-  }
   return toTicketDTO(ticket.toObject(), round.toObject());
 }
 
@@ -172,7 +159,6 @@ async function listPublicPicks(roundId, ticketId) {
     "picks.0": { $exists: true },
     ...(ticketId ? { _id: ticketId } : {}),
   }).populate("userId", "username").sort({ number: 1 }).lean();
-  const persisted = await Pick.find({ roundId: round._id }).sort({ ticketId: 1, matchExternalId: 1 }).lean();
   const matchesById = new Map((round.matches || []).map((match) => [Number(match.externalId), match]));
   const byTicket = new Map();
 
@@ -185,15 +171,9 @@ async function listPublicPicks(roundId, ticketId) {
       picks: [],
     });
   }
-  for (const pick of persisted) {
-    const entry = byTicket.get(String(pick.ticketId));
-    if (entry) entry.picks.push(toPublicPick(pick, matchesById));
-  }
   for (const ticket of tickets) {
     const entry = byTicket.get(String(ticket._id));
-    if (entry && !entry.picks.length) {
-      entry.picks = (ticket.picks || []).map((pick) => toPublicPick(pick, matchesById));
-    }
+    if (entry) entry.picks = (ticket.picks || []).map((pick) => toPublicPick(pick, matchesById));
   }
   for (const entry of byTicket.values()) {
     entry.picks_count = entry.picks.length;

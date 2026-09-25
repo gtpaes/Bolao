@@ -1,7 +1,6 @@
 const Ticket = require("../models/Ticket");
 const Round = require("../models/Round");
 const ScoreLog = require("../models/ScoreLog");
-const Pick = require("../models/Pick");
 const { scorePick, POINTS } = require("../utils/scoring");
 const { getScoringRules } = require("./settingsService");
 const { badRequest } = require("../utils/errors");
@@ -25,10 +24,6 @@ async function processRoundScoring(roundId) {
       if (!match) continue;
       const exists = await ScoreLog.findOne({ ticketId: ticket._id, matchExternalId: Number(pick.matchExternalId) }).lean();
       if (exists) {
-        await Pick.updateOne(
-          { ticketId: ticket._id, matchExternalId: Number(pick.matchExternalId) },
-          { $set: { points: exists.points } }
-        );
         continue;
       }
       const points = scorePick(Number(pick.home), Number(pick.away), Number(match.homeScore), Number(match.awayScore), rules);
@@ -41,10 +36,6 @@ async function processRoundScoring(roundId) {
         actual: { home: Number(match.homeScore), away: Number(match.awayScore) },
         points,
       });
-      await Pick.updateOne(
-        { ticketId: ticket._id, matchExternalId: Number(pick.matchExternalId) },
-        { $set: { points } }
-      );
       changed = true;
       processed += 1;
     }
