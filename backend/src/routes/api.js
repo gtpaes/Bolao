@@ -70,7 +70,6 @@ router.get("/admin/users", authJwt, requireRole("admin", "dev"), adminController
 router.patch("/admin/users/:id/role", authJwt, requireRole("dev"), adminController.setUserRole);
 router.get("/admin/tickets", authJwt, requireRole("admin", "dev"), adminController.listTickets);
 router.post("/admin/tickets/manual", authJwt, requireRole("admin", "dev"), adminController.createManualTicket);
-router.post("/admin/rounds/:id/matches/:matchId/score", authJwt, requireRole("admin", "dev"), adminController.setMatchScore);
 router.get("/admin/settings", authJwt, requireRole("admin", "dev"), adminController.getSettings);
 router.patch("/admin/settings", authJwt, requireRole("admin", "dev"), adminController.updateSettings);
 

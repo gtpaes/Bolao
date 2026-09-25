@@ -282,12 +282,11 @@ export async function adminTickets(view) {
   await run(view, async () => {
     const body = view.querySelector("#admin-tickets-body");
     const roundHost = view.querySelector('[data-host="tickets-round"]');
-    const resultsHost = view.querySelector('[data-host="tickets-results"]');
 
     let rounds = [];
     try { rounds = (await listRounds()).rounds || []; } catch (e) { rounds = []; }
 
-    // Seletor de rodada (filtra a lista e é o alvo dos resultados).
+    // Seletor de rodada (filtra a lista de tickets).
     const selWrap = document.createElement("div");
     selWrap.className = "card";
     selWrap.innerHTML = `<div class="card-header"><h2 class="card-title"><i data-lucide="calendar-clock"></i> Rodada</h2></div>
@@ -330,85 +329,20 @@ export async function adminTickets(view) {
       }
     }
 
-    async function reloadResults() {
-      const rid = select ? select.value : null;
-      if (!rid) { resultsHost.replaceChildren(); return; }
-      resultsHost.replaceChildren(stateNode("off", { title: "Resultados", message: "Carregando resultados…" }));
-      try {
-        const data = await request(`/admin/rounds/${rid}/matches`);
-        const matches = data.matches || [];
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML = `<div class="card-header"><h2 class="card-title"><i data-lucide="goal"></i> Resultados da rodada</h2></div>
-          <div class="card-body">
-            <p class="t-muted t-small">Marca o placar de cada jogo. Um jogo com placar é encerrado e reponta ao instante.</p>
-            <div data-match-rows></div>
-            <button class="btn btn-primary" data-save-results><i data-lucide="save"></i> Salvar resultados</button>
-          </div>`;
-        const rows = card.querySelector("[data-match-rows]");
-        if (!matches.length) {
-          rows.appendChild(stateNode("empty", { title: "Sem jogos", message: "Não há jogos nesta rodada." }));
-        } else {
-          matches.forEach((m) => {
-            const row = document.createElement("div");
-            row.className = "field";
-            row.style.display = "flex";
-            row.style.alignItems = "center";
-            row.style.gap = "var(--space-3)";
-            row.style.flexWrap = "wrap";
-            row.innerHTML = `
-              <span style="min-width:150px"><b>${esc(m.home || "Local")}</b><span class="t-muted"> x </span><b>${esc(m.away || "Visitante")}</b></span>
-              <input class="input" type="number" data-home="${esc(m.externalId)}" placeholder="Local" min="0" max="99" value="${m.home_score ?? ""}">
-              <input class="input" type="number" data-away="${esc(m.externalId)}" placeholder="Visitante" min="0" max="99" value="${m.away_score ?? ""}">
-              <span class="badge">${esc(m.status || "")}</span>`;
-            rows.appendChild(row);
-          });
-        }
-        resultsHost.replaceChildren(card);
-        if (window.lucide) window.lucide.createIcons({ nodes: [card] });
-        card.querySelector("[data-save-results]").addEventListener("click", async (ev) => {
-          const btn = ev.currentTarget;
-          btn.disabled = true;
-          try {
-            let saved = 0;
-            for (const m of matches) {
-              const homeEl = rows.querySelector(`[data-home="${m.externalId}"]`);
-              const awayEl = rows.querySelector(`[data-away="${m.externalId}"]`);
-              if (!homeEl || !awayEl) continue;
-              if (homeEl.value === "" && awayEl.value === "") continue;
-              await request(`/admin/rounds/${rid}/matches/${m.externalId}/score`, { method: "POST", body: { home: homeEl.value, away: awayEl.value } });
-              saved++;
-            }
-            if (!saved) { toastInfo("Nada para salvar", "Preenche o placar dos jogos."); return; }
-            toastSuccess("Resultados salvos", `${saved} jogo(s) atualizados e repuntuados.`);
-            await reloadResults();
-            await reloadTickets();
-          } catch (e) {
-            toastError("Não foi possível salvar", e.message || "Revisa o resultado.");
-          } finally {
-            btn.disabled = false;
-          }
-        });
-      } catch (e) {
-        resultsHost.replaceChildren(stateNode("error", { title: "Não foi possível carregar os resultados", message: e.message || "Tente novamente." }));
-      }
-    }
-
     view.querySelector("#admin-ticket-manual").addEventListener("click", async () => {
       if (!rounds.length) return toastError("Sem rodadas", "Sincronize uma rodada antes.");
       await openManualSaleModal({
         rounds,
         defaultRoundId: select ? select.value : null,
-        onCreated: async () => { await reloadTickets(); await reloadResults(); },
+        onCreated: async () => { await reloadTickets(); },
       });
     });
 
     if (select) {
-      select.addEventListener("change", async () => { await reloadTickets(); await reloadResults(); });
+      select.addEventListener("change", async () => { await reloadTickets(); });
     }
 
     await reloadTickets();
-    await reloadResults();
   });
 }
 
@@ -476,10 +410,57 @@ async function openManualSaleModal({ rounds, defaultRoundId, onCreated }) {
     <div class="field"><label for="mt-user">Usuário (opcional)</label><select class="input" id="mt-user"><option value="">— Comprador sem conta —</option>${userOpts}</select></div>
     <div class="field"><label for="mt-name">Nome do titular</label><input class="input" id="mt-name" placeholder="Nome e sobrenome" /></div>
     <div class="field"><label for="mt-number">Nº do ticket (opcional)</label><input class="input" id="mt-number" type="number" min="1" placeholder="Automático" /></div>
-    <p class="t-muted t-small">Preço: <b>${esc(brl(priceCents / 100))}</b> · vai direto ao financeiro como pago em mão.</p>`;
+    <p class="t-muted t-small">Preço: <b>${esc(brl(priceCents / 100))}</b> · vai direto ao financeiro como pago em mão.</p>
+    <div class="divider"></div>
+    <div class="card-header" style="padding:0 0 var(--space-3)"><h3 class="card-title"><i data-lucide="target"></i> Palpites do ticket</h3></div>
+    <p class="t-muted t-small">Preencha o palpite de cada jogo habilitado da rodada, igual ao ticket normal.</p>
+    <div data-picks-host></div>`;
 
   const userSel = body.querySelector("#mt-user");
   const nameEl = body.querySelector("#mt-name");
+  const roundSel = body.querySelector("#mt-round");
+  const picksHost = body.querySelector("[data-picks-host]");
+  let picksReady = false;
+  let picksRequest = 0;
+
+  async function loadManualPicks(roundId) {
+    const requestId = ++picksRequest;
+    picksReady = false;
+    picksHost.replaceChildren(stateNode("off", { title: "Palpites", message: "Carregando jogos da rodada…" }));
+    if (window.lucide) window.lucide.createIcons({ nodes: [picksHost] });
+    try {
+      const data = await request(`/matches?round=${roundId}`);
+      if (requestId !== picksRequest) return;
+      const matches = (data.matches || []).filter((match) => match.enabled_for_tickets !== false);
+      if (!matches.length) {
+        picksHost.replaceChildren(stateNode("empty", { title: "Sem jogos", message: "Esta rodada não possui jogos habilitados." }));
+        return;
+      }
+      picksHost.innerHTML = `<div class="table-wrap"><table class="table">
+        <thead><tr><th>Jogo</th><th>Data</th><th>Mandante</th><th>Visitante</th></tr></thead>
+        <tbody>${matches.map((m) => `<tr data-manual-pick="${esc(m.externalId)}">
+          <td><strong>${esc(m.home || "Local")}</strong><span class="t-muted"> x </span><strong>${esc(m.away || "Visitante")}</strong></td>
+          <td class="t-muted t-small">${esc(dateTime(m.date))}</td>
+          <td><input class="input" type="number" inputmode="numeric" min="0" max="99" data-pick-side="home" aria-label="Palpite do mandante" placeholder="Gols"></td>
+          <td><input class="input" type="number" inputmode="numeric" min="0" max="99" data-pick-side="away" aria-label="Palpite do visitante" placeholder="Gols"></td>
+        </tr>`).join("")}</tbody>
+      </table></div>`;
+      picksHost.querySelectorAll("input[data-pick-side]").forEach((input) => {
+        input.addEventListener("input", () => {
+          if (input.value !== "" && !/^\d{1,2}$/.test(input.value)) input.setCustomValidity("Use um número entre 0 e 99.");
+          else input.setCustomValidity("");
+        });
+      });
+      picksReady = true;
+    } catch (e) {
+      if (requestId !== picksRequest) return;
+      picksHost.replaceChildren(stateNode("error", { title: "Não foi possível carregar os jogos", message: e.message || "Tente novamente." }));
+    }
+  }
+
+  roundSel.addEventListener("change", async () => { await loadManualPicks(roundSel.value); });
+  await loadManualPicks(roundSel.value);
+
   if (userSel && nameEl) {
     userSel.addEventListener("change", () => {
       const u = users.find((x) => String(x.id) === userSel.value);
@@ -502,10 +483,29 @@ async function openManualSaleModal({ rounds, defaultRoundId, onCreated }) {
     const name = body.querySelector("#mt-name").value.trim();
     const rawNumber = body.querySelector("#mt-number").value.trim();
     if (!roundId) { toastError("Falta a rodada", "Escolha uma rodada."); btn.disabled = false; return; }
+    if (!picksReady) { toastError("Palpites não carregados", "Aguarde os jogos da rodada ou tente novamente."); btn.disabled = false; return; }
+    const rows = Array.from(picksHost.querySelectorAll("tr[data-manual-pick]"));
+    const picks = rows.map((row) => ({
+      matchId: Number(row.dataset.manualPick),
+      home: row.querySelector("[data-pick-side='home']").value.trim(),
+      away: row.querySelector("[data-pick-side='away']").value.trim(),
+    }));
+    const invalidPick = picks.find((pick) => !/^\d{1,2}$/.test(pick.home) || !/^\d{1,2}$/.test(pick.away));
+    if (!rows.length || invalidPick) {
+      toastError("Palpites incompletos", "Preencha os gols de todos os jogos usando números de 0 a 99.");
+      btn.disabled = false;
+      return;
+    }
     try {
       const res = await request("/admin/tickets/manual", {
         method: "POST",
-        body: { roundId, userId, name, number: rawNumber === "" ? null : Number(rawNumber) },
+        body: {
+          roundId,
+          userId,
+          name,
+          number: rawNumber === "" ? null : Number(rawNumber),
+          picks: picks.map((pick) => ({ ...pick, home: Number(pick.home), away: Number(pick.away) })),
+        },
       });
       const t = (res && res.ticket) || {};
       toastSuccess("Venda registrada", `Ticket ${t.number || ""} de ${t.owner || name || "—"} (${brl((t.priceCents || priceCents) / 100)}).`);

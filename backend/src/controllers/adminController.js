@@ -171,21 +171,12 @@ async function listTickets(req, res, next) {
   } catch (e) { return next(e); }
 }
 
-// Venda em mão (sem Pix): pago aprovado direto ao financeiro + ticket liberado.
+// Venda em mão (sem Pix): pagamento aprovado direto ao financeiro, ticket e palpites.
 async function createManualTicket(req, res, next) {
   try {
-    const { roundId, name, number, userId } = req.body || {};
-    const data = await manualTicketService.createManualTicket({ roundId, name, number, userId });
+    const { roundId, name, number, userId, picks } = req.body || {};
+    const data = await manualTicketService.createManualTicket({ roundId, name, number, userId, picks });
     return res.status(201).json(data);
-  } catch (e) { return next(e); }
-}
-
-// Lança o resultado de um jogo e repontua a rodada na hora.
-async function setMatchScore(req, res, next) {
-  try {
-    const { home, away } = req.body || {};
-    const data = await manualTicketService.setMatchScore(req.params.id, req.params.matchId, home, away);
-    return res.json(data);
   } catch (e) { return next(e); }
 }
 
@@ -215,4 +206,4 @@ async function updateSettings(req, res, next) {
   catch (e) { return next(e); }
 }
 
-module.exports = { overview, setDeadline, closeRound, reopenRound, setRoundAutomatic, syncNow, setRoundMatches, addMatch, listUsers, listTickets, createManualTicket, setMatchScore, setUserRole, getSettings, updateSettings };
+module.exports = { overview, setDeadline, closeRound, reopenRound, setRoundAutomatic, syncNow, setRoundMatches, addMatch, listUsers, listTickets, createManualTicket, setUserRole, getSettings, updateSettings };
