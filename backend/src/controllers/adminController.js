@@ -137,6 +137,23 @@ async function addMatch(req, res, next) {
   } catch (e) { return next(e); }
 }
 
+async function roundBetsReport(req, res, next) {
+  try {
+    const roundId = req.query.round;
+    if (!roundId || !Types.ObjectId.isValid(String(roundId))) throw badRequest("Rodada inválida.");
+    const round = await Round.findById(String(roundId)).lean();
+    if (!round) throw notFound("Rodada não encontrada.");
+    const matches = (round.matches || []).filter((m) => m.enabledForTickets !== false).map((m) => ({ externalId: Number(m.externalId), home: m.home, away: m.away }));
+    const tickets = await Ticket.find({ roundId: round._id, status: { $in: ["released", "closed", "scored"] }, "picks.0": { $exists: true } }).populate("userId", "username").sort({ number: 1 }).lean();
+    return res.json({
+      round: { id: String(round._id), number: round.number, name: round.name || "" },
+      matches,
+      tickets: tickets.map((t) => ({ id: String(t._id), number: t.number, ownerName: (t.ownerName && t.ownerName.trim()) || (t.userId && t.userId.username) || "—", picks: (t.picks || []).map((p) => ({ matchExternalId: Number(p.matchExternalId), home: p.home, away: p.away })) })),
+    });
+  } catch (e) { return next(e); }
+}
+
+
 async function listUsers(req, res, next) {
   try {
     const users = await User.find({}).sort({ createdAt: -1 }).limit(200).lean();
@@ -206,4 +223,4 @@ async function updateSettings(req, res, next) {
   catch (e) { return next(e); }
 }
 
-module.exports = { overview, setDeadline, closeRound, reopenRound, setRoundAutomatic, syncNow, setRoundMatches, addMatch, listUsers, listTickets, createManualTicket, setUserRole, getSettings, updateSettings };
+module.exports = { overview, setDeadline, closeRound, reopenRound, setRoundAutomatic, syncNow, setRoundMatches, addMatch, listUsers, listTickets, roundBetsReport, createManualTicket, setUserRole, getSettings, updateSettings };

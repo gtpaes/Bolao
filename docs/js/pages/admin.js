@@ -32,6 +32,33 @@ export async function adminDashboard(view) {
     ];
     view.querySelector("#admin-stats").replaceChildren(...stats.map(statCard));
 
+    const reportSelect = view.querySelector("#report-round");
+    const reportButton = view.querySelector("#generate-bets-pdf");
+    let reportRounds = [];
+    try { reportRounds = (await listRounds()).rounds || []; } catch (e) { reportRounds = []; }
+    if (reportSelect) {
+      reportSelect.innerHTML = reportRounds.length
+        ? reportRounds.map((r) => `<option value="${esc(r.id)}">Rodada ${esc(String(r.number))}</option>`).join("")
+        : `<option value="">Sem rodadas</option>`;
+      if (roundsCurrent(overview.currentRound, reportRounds)) reportSelect.value = overview.currentRound.id;
+      reportSelect.disabled = !reportRounds.length;
+    }
+    if (reportButton) {
+      reportButton.disabled = !reportRounds.length;
+      reportButton.addEventListener("click", async () => {
+        if (!reportSelect || !reportSelect.value) return;
+        reportButton.disabled = true;
+        try {
+          const report = await request(`/admin/reports/round-bets?round=${reportSelect.value}`);
+          printRoundBetsReport(report);
+        } catch (e) {
+          toastError("Não foi possível gerar o relatório", e.message || "Tente novamente.");
+        } finally {
+          reportButton.disabled = false;
+        }
+      });
+    }
+
     const curHost = view.querySelector('[data-host="current-round"]');
     let round = null;
     round = overview.currentRound || null;
@@ -380,7 +407,48 @@ export async function adminLogs(view) {
   });
 }
 
-/* ---------------- helpers ---------------- */
+function roundsCurrent(current, rounds) {
+  return Boolean(current && rounds.some((r) => String(r.id) === String(current.id)));
+}
+
+function printRoundBetsReport(report) {
+  const popup = window.open("", "_blank", "width=1400,height=900");
+  if (!popup) { toastError("Não foi possível abrir o relatório", "Permita pop-ups para este site."); return; }
+  const matches = report.matches || [];
+  const tickets = report.tickets || [];
+  const header = matches.map((m) => `<th>${esc(m.home || "Local")}<br><span>x</span><br>${esc(m.away || "Visitante")}</th>`).join("");
+  const rows = tickets.map((ticket, rowIndex) => {
+    const byMatch = new Map((ticket.picks || []).map((pick) => [String(pick.matchExternalId), pick]));
+    const cells = matches.map((match) => {
+      const pick = byMatch.get(String(match.externalId));
+      return `<td>${pick ? esc(String(pick.home)) + " x " + esc(String(pick.away)) : "—"}</td>`;
+    }).join("");
+    return `<tr class="${rowIndex % 2 ? "alternate" : ""}"><th class="player">${esc(ticket.ownerName || "—")}</th><td class="ticket-number">${esc(String(ticket.number))}</td>${cells}</tr>`;
+  }).join("");
+  const title = `Apostas da Rodada ${report.round.number}`;
+  popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+    *{box-sizing:border-box}body{margin:0;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;font-size:9px}
+    .toolbar{padding:12px 16px;background:#f3f4f6;border-bottom:1px solid #d1d5db;display:flex;gap:10px;align-items:center}
+    .toolbar button{border:1px solid #555;background:#fff;padding:7px 12px;cursor:pointer;font-weight:700}
+    .sheet{padding:14px 16px 20px}.title{font-size:16px;font-weight:700;margin-bottom:3px}.meta{color:#555;margin-bottom:10px}
+    table{border-collapse:collapse;table-layout:fixed;width:100%;min-width:900px}
+    th,td{border:1px solid #9ca3af;padding:6px 5px;text-align:center;vertical-align:middle}
+    thead th{background:#e5e7eb;font-weight:700;line-height:1.25;height:58px}
+    thead th:first-child{width:180px;text-align:left}thead th:nth-child(2){width:55px}
+    tbody th{background:#f9fafb;text-align:left;font-weight:700}.ticket-number{font-weight:700;background:#f9fafb}
+    tbody tr.alternate{background:#f3f4f6}.sheet table{font-variant-numeric:tabular-nums}
+    @page{size:A4 landscape;margin:7mm}
+    @media print{.toolbar{display:none}.sheet{padding:0}body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+  </style></head><body>
+    <div class="toolbar"><button onclick="window.print()">Imprimir / Salvar como PDF</button><span>${esc(title)}</span></div>
+    <main class="sheet"><div class="title">${esc(title)}</div><div class="meta">${tickets.length} ticket(s) · ${matches.length} jogo(s) · gerado em ${esc(new Date().toLocaleString("pt-BR"))}</div>
+    <table><thead><tr><th>Apostador</th><th>Ticket</th>${header}</tr></thead><tbody>${rows || `<tr><td colspan="${matches.length + 2}">Nenhuma aposta registrada.</td></tr>`}</tbody></table></main>
+  </body></html>`);
+  popup.document.close();
+  popup.focus();
+}
+
+
 function statCard(s) {
   const c = document.createElement("div");
   c.className = "card";

@@ -19,6 +19,15 @@
       <a href="#/admin/round" class="btn-link">Gerenciar</a></div>
     <div class="card-body" data-host="current-round"></div>
   </div>
+  <div class="card" data-host="report-actions">
+    <div class="card-header"><h2 class="card-title"><i data-lucide="file-spreadsheet"></i> Relatório de apostas</h2></div>
+    <div class="card-body stack">
+      <label class="field"><span class="t-ttl">Rodada do relatório</span><select class="input" id="report-round"></select></label>
+      <button class="btn btn-primary btn-block" id="generate-bets-pdf"><i data-lucide="file-down"></i> Gerar PDF das apostas</button>
+      <p class="t-muted t-small">Busca automaticamente os tickets e palpites da rodada selecionada.</p>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-header"><h2 class="card-title"><i data-lucide="activity"></i> Ações rápidas</h2></div>
     <div class="card-body stack">
