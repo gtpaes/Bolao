@@ -1,7 +1,7 @@
 /* js/pages/admin.js — Páginas da área administrativa */
 import { loadTemplate, run } from "./loader.js";
 import { stateNode } from "../../utils/states.js";
-import { esc } from "../../utils/dom.js";
+import { esc, hydrateIcons } from "../../utils/dom.js";
 import { brl, dateShort, dateTime } from "../../utils/format.js";
 import { getCurrentRound, listRounds } from "../api/rounds.js";
 import { openModal } from "../../components/modal.js";
@@ -116,6 +116,22 @@ export async function adminRound(view) {
             <button class="btn btn-ghost" id="r-automatic">Voltar ao automático</button>
           </div>
         </div>
+      </div>
+
+      <div class="card" style="margin-top:var(--space-5)">
+        <div class="card-header">
+          <h2 class="card-title"><i data-lucide="refresh-cw"></i> Resultados da API</h2>
+        </div>
+        <div class="card-body">
+          <p class="t-muted t-small">Se um placar ficou errado (ex.: gol anulado, correção da liga), force a sincronização para puxar o resultado oficial da API-Futebol. Os pontos dos palpites são recalculados automaticamente.</p>
+          <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;align-items:center;margin:var(--space-3) 0">
+            <button class="btn btn-primary" id="r-sync-now" ${!current ? "disabled" : ""}>
+              <i data-lucide="download-cloud"></i> Forçar sincronização
+            </button>
+            <span id="r-sync-status" class="t-muted t-small"></span>
+          </div>
+          <div id="r-matches-host"></div>
+        </div>
       </div>`;
 
     const roundId = current && current.id;
@@ -155,6 +171,70 @@ export async function adminRound(view) {
         toastSuccess("Controle automático", "A rodada volta a fechar sozinha 2h antes do 1º jogo.");
       } catch (e) { toastError("Não foi possível alterar", e.message); }
     });
+
+    // ===== Gerenciamento de resultados (sync + visualização) =====
+    const matchesHost = view.querySelector("#r-matches-host");
+    const syncStatusEl = view.querySelector("#r-sync-status");
+
+    async function loadAdminMatches() {
+      if (!roundId) {
+        matchesHost.innerHTML = '<p class="t-muted t-small">Selecione uma rodada para ver os jogos.</p>';
+        return;
+      }
+      try {
+        const data = await request(`/admin/rounds/${roundId}/matches`);
+        const matches = data.matches || [];
+        if (!matches.length) {
+          matchesHost.innerHTML = '<p class="t-muted t-small">Nenhum jogo nesta rodada.</p>';
+          return;
+        }
+        const rows = matches.map((m) => {
+          const score = m.home_score != null ? `${m.home_score} x ${m.away_score}` : "—";
+          const statusBadge = m.status === "finished"
+            ? '<span class="badge badge-green">Encerrado</span>'
+            : m.status === "live"
+              ? '<span class="badge badge-red">Ao vivo</span>'
+              : m.status === "postponed"
+                ? '<span class="badge badge-yellow">Adiado</span>'
+                : '<span class="badge badge-gray">Agendado</span>';
+          return `<tr>
+            <td><strong>${esc(m.home)}</strong> x <strong>${esc(m.away)}</strong></td>
+            <td>${statusBadge}</td>
+            <td><strong>${score}</strong></td>
+          </tr>`;
+        }).join("");
+        matchesHost.innerHTML = `
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Jogo</th><th>Status</th><th>Placar</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+        hydrateIcons(matchesHost);
+      } catch (e) {
+        matchesHost.innerHTML = `<p class="t-muted t-small">Não foi possível carregar os jogos: ${esc(e.message)}</p>`;
+      }
+    }
+
+    view.querySelector("#r-sync-now").addEventListener("click", async (ev) => {
+      const btn = ev.currentTarget;
+      btn.disabled = true;
+      syncStatusEl.textContent = "Sincronizando com a API…";
+      try {
+        const result = await request("/admin/sync/round", { method: "POST", body: { round: current ? current.number : undefined } });
+        const updated = result.updated || 0;
+        const rec = (result.reconciled && result.reconciled.adjusted) || 0;
+        syncStatusEl.textContent = `✓ Sincronizado. ${updated} jogo(s) atualizado(s), ${rec} reconciliado(s).`;
+        await loadAdminMatches();
+      } catch (e) {
+        syncStatusEl.textContent = `✕ Falha: ${e.message}`;
+        toastError("Sincronização falhou", e.message || "Verifique a configuração da API.");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    await loadAdminMatches();
 
   });
 }
