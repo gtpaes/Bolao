@@ -224,7 +224,8 @@ export async function adminRound(view) {
         const result = await request("/admin/sync/round", { method: "POST", body: { round: current ? current.number : undefined } });
         const updated = result.updated || 0;
         const rec = (result.reconciled && result.reconciled.adjusted) || 0;
-        syncStatusEl.textContent = `✓ Sincronizado. ${updated} jogo(s) atualizado(s), ${rec} reconciliado(s).`;
+        const scored = (result.scored && result.scored.processed) || 0;
+        syncStatusEl.textContent = `✓ Sincronizado. ${updated} jogo(s) atualizado(s), ${rec} reconciliado(s), ${scored} palpite(s) recalculado(s).`;
         await loadAdminMatches();
       } catch (e) {
         syncStatusEl.textContent = `✕ Falha: ${e.message}`;

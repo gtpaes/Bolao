@@ -24,6 +24,21 @@ async function processRoundScoring(roundId) {
       if (!match) continue;
       const exists = await ScoreLog.findOne({ ticketId: ticket._id, matchExternalId: Number(pick.matchExternalId) }).lean();
       if (exists) {
+        // O placar real mudou desde a pontuacao original (ex.: gol anulado,
+        // correcao da API-Futebol)? Se sim, recalcula os pontos com o
+        // placar atualizado - sem isso o sync corrige o jogo mas os
+        // jogadores ficam com os pontos do placar antigo.
+        const actualChanged = Number(exists.actual && exists.actual.home) !== Number(match.homeScore)
+          || Number(exists.actual && exists.actual.away) !== Number(match.awayScore);
+        if (!actualChanged) continue;
+        const points = scorePick(Number(pick.home), Number(pick.away), Number(match.homeScore), Number(match.awayScore), rules);
+        pick.points = points;
+        await ScoreLog.updateOne(
+          { _id: exists._id },
+          { $set: { actual: { home: Number(match.homeScore), away: Number(match.awayScore) }, points, processedAt: new Date() } },
+        );
+        changed = true;
+        processed += 1;
         continue;
       }
       const points = scorePick(Number(pick.home), Number(pick.away), Number(match.homeScore), Number(match.awayScore), rules);

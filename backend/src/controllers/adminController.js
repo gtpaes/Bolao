@@ -100,8 +100,8 @@ async function syncNow(req, res, next) {
     const force = req.body && req.body.round != null ? Number(req.body.round) : undefined;
     const result = await syncRound(force);
     const reconciled = await reconcilePendingRounds();
-    await scoreFinishedRounds();
-    return res.json({ ok: true, ...result, reconciled });
+    const scored = await scoreFinishedRounds();
+    return res.json({ ok: true, ...result, reconciled, scored });
   } catch (e) { return next(e); }
 }
 
