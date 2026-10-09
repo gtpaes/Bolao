@@ -22,41 +22,44 @@ async function processRoundScoring(roundId) {
     for (const pick of ticket.picks || []) {
       const match = finished.find((m) => Number(m.externalId) === Number(pick.matchExternalId));
       if (!match) continue;
+      const actualHome = Number(match.homeScore);
+      const actualAway = Number(match.awayScore);
+      const points = scorePick(Number(pick.home), Number(pick.away), actualHome, actualAway, rules);
       const exists = await ScoreLog.findOne({ ticketId: ticket._id, matchExternalId: Number(pick.matchExternalId) }).lean();
       if (exists) {
-        // O placar real mudou desde a pontuacao original (ex.: gol anulado,
-        // correcao da API-Futebol)? Se sim, recalcula os pontos com o
-        // placar atualizado - sem isso o sync corrige o jogo mas os
-        // jogadores ficam com os pontos do placar antigo.
-        const actualChanged = Number(exists.actual && exists.actual.home) !== Number(match.homeScore)
-          || Number(exists.actual && exists.actual.away) !== Number(match.awayScore);
-        if (!actualChanged) continue;
-        const points = scorePick(Number(pick.home), Number(pick.away), Number(match.homeScore), Number(match.awayScore), rules);
+        const actualChanged = Number(exists.actual && exists.actual.home) !== actualHome
+          || Number(exists.actual && exists.actual.away) !== actualAway;
+        const logPointsChanged = Number(exists.points) !== points;
+        const pickPointsChanged = Number(pick.points) !== points;
+        if (!actualChanged && !logPointsChanged && !pickPointsChanged) continue;
+
         pick.points = points;
         await ScoreLog.updateOne(
           { _id: exists._id },
-          { $set: { actual: { home: Number(match.homeScore), away: Number(match.awayScore) }, points, processedAt: new Date() } },
+          { $set: { actual: { home: actualHome, away: actualAway }, points, processedAt: new Date() } },
         );
         changed = true;
         processed += 1;
         continue;
       }
-      const points = scorePick(Number(pick.home), Number(pick.away), Number(match.homeScore), Number(match.awayScore), rules);
       pick.points = points;
       await ScoreLog.create({
         roundId: round._id,
         ticketId: ticket._id,
         matchExternalId: Number(pick.matchExternalId),
         predicted: { home: Number(pick.home), away: Number(pick.away) },
-        actual: { home: Number(match.homeScore), away: Number(match.awayScore) },
+        actual: { home: actualHome, away: actualAway },
         points,
       });
       changed = true;
       processed += 1;
     }
-    if (changed) {
-      ticket.points = (ticket.picks || []).reduce((s, p) => s + (Number(p.points) || 0), 0);
-      if (ticket.status === "released") ticket.status = "scored";
+    const totalPoints = (ticket.picks || []).reduce((s, p) => s + (Number(p.points) || 0), 0);
+    if (changed || Number(ticket.points) !== totalPoints) {
+      ticket.points = totalPoints;
+      if (ticket.status === "released" && finished.some((match) =>
+        (ticket.picks || []).some((pick) => Number(pick.matchExternalId) === Number(match.externalId)),
+      )) ticket.status = "scored";
       await ticket.save();
     }
   }
